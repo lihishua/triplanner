@@ -4,7 +4,7 @@
 // Supabase: Project Settings → API
 // Find: Project URL and anon/public key
 
-window.WAYFARE_CONFIG = {
+window.TRIPLANNER_CONFIG = {
   SUPABASE_URL: "https://YOUR-PROJECT.supabase.co",
   SUPABASE_ANON_KEY: "YOUR-ANON-KEY",
 };

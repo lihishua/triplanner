@@ -1,62 +1,52 @@
-# Wayfare — setup
+# TriPlanner
 
-A shared trip planner for two people. Front end is static; Supabase provides
-auth + Postgres + the AI edge function.
+A shared trip planner. Plan countries, cities, flights and budget together — or solo in guest mode (no account needed, data stays local).
 
-## Files
-```
-web/index.html     front end shell
-web/app.js         all logic (auth, sync, map, weather, AI)
-web/config.js      <- paste your Supabase URL + anon key here
-supabase/schema.sql                       run once in SQL editor
-supabase/functions/investigate/index.ts   AI briefing (Claude), runs server-side
-```
+## Stack
+- Vanilla JS + HTML/CSS, no build step
+- Supabase — auth, Postgres, Edge Function (AI)
+- Leaflet — map
+- Open-Meteo — weather (free, no key)
+- Anthropic Claude — "Investigate with AI" (optional, server-side only)
 
-## 1. Supabase project
-1. Create a project at supabase.com.
-2. SQL editor → paste **schema.sql** → run. This creates tables + RLS.
-   Then paste **budget.sql** → run, to add the Budget tables.
-3. Project Settings → API → copy the **Project URL** and **anon public key**
-   into `web/config.js`.
+## Setup
 
-## 2. Both of you sign up
-- Deploy the front end (below) or run locally, then each of you hits **Sign up** once.
-- Auth → Providers: email is on by default. For just the two of you, you can
-  turn **off** "Confirm email" (Auth → Providers → Email) to skip the confirm step.
+### 1. Supabase project
+1. Create a project at [supabase.com](https://supabase.com)
+2. SQL Editor → run `schema.sql`, then run `budget.sql`
+3. Authentication → Providers → Email → turn off **Confirm email** (easier for personal use)
+4. Project Settings → API → copy **Project URL** and **anon/public key** into `config.js`
 
-## 3. Create the shared trip (one time)
-After both accounts exist, open SQL editor and run the commented block at the
-bottom of `schema.sql`, replacing the two emails with yours. This makes one
-trip and adds you both as members — that's what makes you see the same data.
+### 2. config.js
+Copy `config.example.js` → `config.js` and fill in your values. This file is git-ignored.
 
-## 4. AI "Investigate" feature
-```
-# Supabase CLI:
+### 3. Sign up & create a trip
+- Open the app, sign up with your email + password
+- Create your first trip (give it a name)
+- To invite someone: they sign up, then enter your email + trip name to join
+
+### 4. AI "Investigate" (optional)
+The "Investigate with AI" button calls a Supabase Edge Function. To enable it:
+```bash
 supabase functions deploy investigate
 supabase secrets set ANTHROPIC_API_KEY=sk-ant-xxxxx
 ```
-Get the key from console.anthropic.com → API keys. Billed per use (a briefing
-is a few cents at most). Until this is deployed, the button shows a friendly
-"not reachable yet" message instead of breaking.
+Get the key from [console.anthropic.com](https://console.anthropic.com) → API Keys.
+Until deployed, the button shows a friendly message instead of breaking.
 
-## 5. Deploy the front end
-Any static host. The `web/` folder is the root.
-- Netlify / Vercel: drag-drop `web/`, or point at the repo with build command
-  none and publish dir `web`.
-- Or `cd web && python3 -m http.server` to try locally.
-
-## Notes / honest limits
-- The capture box files a **typed** place + optional link. The browser can't
-  read the contents of an Instagram URL (Instagram blocks cross-site fetches),
-  so you type "Hoi An, Vietnam" and paste the link to keep alongside it.
-  Geocoding (the map pin) is automatic via OpenStreetMap.
-- Weather is live from Open-Meteo (no key needed).
-- The anon key in config.js is meant to be public; your data is protected by
-  the Row-Level Security policies, not by hiding the key.
-- Budget page: add expenses with category + optional country tag, set an
-  overall target, see a spend meter and a per-category breakdown.
-  **Currency caveat:** amounts are summed as entered and NOT converted between
-  currencies. For the total/meter to be meaningful, keep expenses in one
-  currency (or treat the number as a rough mixed figure). Live FX conversion
-  would be a later add (free rates API + a chosen base currency).
+### 5. Run locally
+```bash
+python3 -m http.server
+# or open index.html directly in a browser
 ```
+
+### 6. Deploy
+Any static host (Netlify, Vercel, GitHub Pages). No build step — the repo root is the publish directory.
+
+## Guest mode
+Click **Continue as guest** on the login screen — no account needed. All data is saved in your browser's localStorage only. AI investigate is not available in guest mode.
+
+## Notes
+- **Capture** — type a place name ("Hoi An, Vietnam") and optionally paste an Instagram link. Geocoding is automatic via OpenStreetMap.
+- **Budget** — amounts are summed as entered, not converted between currencies. Keep expenses in one currency for the total to be meaningful.
+- The Supabase anon key in `config.js` is safe for the browser — your data is protected by Row-Level Security, not by hiding the key.

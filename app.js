@@ -1,6 +1,6 @@
-/* app.js — Wayfare front-end logic */
+/* app.js — TriPlanner front-end logic */
 
-const { SUPABASE_URL, SUPABASE_ANON_KEY } = window.WAYFARE_CONFIG;
+const { SUPABASE_URL, SUPABASE_ANON_KEY } = window.TRIPLANNER_CONFIG;
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let TRIP_ID = null;
