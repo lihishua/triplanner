@@ -11,7 +11,10 @@ let cities = [];
 let flights = [];
 let expenses = [];
 let budgetTarget = null;
+let research = [];
 let previewMapInstance = null;
+let _researchImageFile = null;
+let _researchImageB64  = null;
 
 /* ---------------- GUEST / LOCAL STORAGE ---------------- */
 const GUEST_TRIP_ID = 'guest';
@@ -207,19 +210,22 @@ async function refreshAll() {
     expenses     = allExpenses.filter(r => r.trip_id === TRIP_ID)
                               .sort((a,b) => (b.spent_on||'').localeCompare(a.spent_on||''));
     budgetTarget = allBudget.find(r => r.trip_id === TRIP_ID) || null;
-    renderCountries(); renderFlights(); renderBudget();
+    research     = lsGet('flight_research').filter(r => r.trip_id === TRIP_ID)
+                              .sort((a,b) => b.created_at.localeCompare(a.created_at));
+    renderCountries(); renderFlights(); renderResearch(); renderBudget();
     return;
   }
-  const [c, ci, f, ex, bs] = await Promise.all([
+  const [c, ci, f, ex, bs, res] = await Promise.all([
     sb.from('countries').select('*').order('created_at'),
     sb.from('cities').select('*').order('created_at'),
     sb.from('flights').select('*').order('created_at'),
     sb.from('expenses').select('*').order('spent_on', { ascending: false }),
     sb.from('budget_settings').select('*').eq('trip_id', TRIP_ID).maybeSingle(),
+    sb.from('flight_research').select('*').eq('trip_id', TRIP_ID).order('created_at', { ascending: false }),
   ]);
   countries = c.data || []; cities = ci.data || []; flights = f.data || [];
-  expenses = ex.data || []; budgetTarget = bs.data || null;
-  renderCountries(); renderFlights(); renderBudget();
+  expenses = ex.data || []; budgetTarget = bs.data || null; research = res.data || [];
+  renderCountries(); renderFlights(); renderResearch(); renderBudget();
 }
 
 async function ensureCountry(name, flag) {
@@ -604,6 +610,114 @@ function openCapture(){
 function capMsg(m){ document.getElementById('cap-msg').textContent=m; }
 function closeAll(){ document.querySelectorAll('.overlay').forEach(o=>o.classList.remove('show')); }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeAll(); closePreview(); } });
+
+/* ---------------- FLIGHT RESEARCH ---------------- */
+function renderResearch() {
+  const el = document.getElementById('researchList');
+  if (!research.length) {
+    el.innerHTML = '<div class="empty">Nothing saved yet. Add notes, screenshots or links about flights you\'re considering.</div>';
+    return;
+  }
+  el.innerHTML = research.map(r => `
+    <div class="card research-card">
+      <button class="del" onclick="delResearch('${r.id}')">×</button>
+      ${r.image_url ? `<img src="${esc(r.image_url)}" class="research-img" onclick="zoomResearchImage('${esc(r.image_url)}')">` : ''}
+      ${r.content   ? `<div class="research-text">${esc(r.content)}</div>` : ''}
+      ${r.link_url  ? `<a href="${esc(r.link_url)}" target="_blank" class="research-link">↗ ${esc(r.link_label || r.link_url)}</a>` : ''}
+      <div class="research-date">${new Date(r.created_at).toLocaleDateString()}</div>
+    </div>`).join('');
+}
+
+function openResearch() {
+  document.getElementById('r-content').value = '';
+  document.getElementById('r-link-url').value = '';
+  document.getElementById('r-link-label').value = '';
+  document.getElementById('r-image-input').value = '';
+  document.getElementById('r-image-preview').style.display = 'none';
+  document.getElementById('r-msg').textContent = '';
+  _researchImageFile = null; _researchImageB64 = null;
+  openOverlay('ov-research');
+}
+
+function onResearchImagePick(input) {
+  const file = input.files[0]; if (!file) return;
+  if (file.size > 5 * 1024 * 1024) {
+    document.getElementById('r-msg').textContent = 'Image too large (max 5 MB). Try a compressed screenshot.';
+    input.value = ''; return;
+  }
+  _researchImageFile = file;
+  const preview = document.getElementById('r-image-preview');
+  preview.src = URL.createObjectURL(file);
+  preview.style.display = 'block';
+  const reader = new FileReader();
+  reader.onload = e => { _researchImageB64 = e.target.result; };
+  reader.readAsDataURL(file);
+}
+
+async function saveResearch() {
+  const content   = document.getElementById('r-content').value.trim();
+  const linkUrl   = document.getElementById('r-link-url').value.trim();
+  const linkLabel = document.getElementById('r-link-label').value.trim();
+  const rMsg = m => document.getElementById('r-msg').textContent = m;
+
+  if (!content && !_researchImageFile && !linkUrl) return rMsg('Add some text, an image, or a link.');
+
+  if (GUEST_MODE) {
+    if (_researchImageFile && _researchImageB64) {
+      if (_researchImageB64.length > 1.5 * 1024 * 1024)
+        return rMsg('Image too large for guest mode. Add a link to the image instead, or sign in to upload.');
+    }
+    lsInsert('flight_research', {
+      trip_id: TRIP_ID, content: content || null,
+      image_url: _researchImageB64 || null, link_url: linkUrl || null, link_label: linkLabel || null,
+    });
+    closeAll(); research = lsGet('flight_research').filter(r => r.trip_id === TRIP_ID)
+      .sort((a,b) => b.created_at.localeCompare(a.created_at));
+    renderResearch(); return;
+  }
+
+  let imageUrl = null;
+  if (_researchImageFile) {
+    const path = `${TRIP_ID}/${Date.now()}-${_researchImageFile.name}`;
+    const { error: upErr } = await sb.storage.from('research').upload(path, _researchImageFile);
+    if (upErr) return rMsg('Image upload failed: ' + upErr.message);
+    imageUrl = sb.storage.from('research').getPublicUrl(path).data.publicUrl;
+  }
+
+  const { error } = await sb.from('flight_research').insert({
+    trip_id: TRIP_ID, content: content || null,
+    image_url: imageUrl, link_url: linkUrl || null, link_label: linkLabel || null,
+  });
+  if (error) return rMsg(error.message);
+  closeAll(); await refreshAll();
+}
+
+async function delResearch(id) {
+  if (GUEST_MODE) {
+    lsDelete('flight_research', id);
+    research = lsGet('flight_research').filter(r => r.trip_id === TRIP_ID)
+      .sort((a,b) => b.created_at.localeCompare(a.created_at));
+    renderResearch(); return;
+  }
+  const item = research.find(r => r.id === id);
+  if (item?.image_url?.includes('/research/')) {
+    const path = item.image_url.split('/research/').pop().split('?')[0];
+    await sb.storage.from('research').remove([path]);
+  }
+  await sb.from('flight_research').delete().eq('id', id);
+  await refreshAll();
+}
+
+function zoomResearchImage(url) {
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:200;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:20px';
+  const img = document.createElement('img');
+  img.src = url;
+  img.style.cssText = 'max-width:92vw;max-height:92vh;border-radius:10px;object-fit:contain';
+  ov.appendChild(img);
+  ov.onclick = () => document.body.removeChild(ov);
+  document.body.appendChild(ov);
+}
 
 /* ---------------- TRIP PREVIEW (Mapbox globe animation) ---------------- */
 
