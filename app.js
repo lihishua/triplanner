@@ -258,14 +258,27 @@ async function runCapture() {
   if (text.includes(',')) {
     [cityName, countryName] = text.split(',').map(s => s.trim());
   } else {
-    const known = Object.keys(FLAGS).find(k => text.toLowerCase().includes(k));
-    if (known) { countryName = cap(known); cityName = text.replace(new RegExp(known,'i'),'').trim(); }
+    // Check if the whole text is a known country name
+    const exactCountry = Object.keys(FLAGS).find(k => k === text.toLowerCase());
+    if (exactCountry) {
+      countryName = cap(exactCountry);
+      cityName = ''; // country-only entry
+    } else {
+      const known = Object.keys(FLAGS).find(k => text.toLowerCase().includes(k));
+      if (known) { countryName = cap(known); cityName = text.replace(new RegExp(known,'i'),'').trim(); }
+    }
   }
-  if (!countryName) return capMsg('Add the country too, e.g. "Hoi An, Vietnam".');
+  // If still no country, treat the whole thing as country-only (user knows what they typed)
+  if (!countryName) { countryName = cap(text); cityName = ''; }
 
-  capMsg('Filing… looking up the location.');
+  capMsg('Filing…');
   const country = await ensureCountry(cap(countryName), FLAGS[countryName.toLowerCase()] || '🌍');
   if (!country) return;
+
+  // Country-only entry — no city to add
+  if (!cityName) { closeAll(); await refreshAll(); return; }
+
+  capMsg('Filing… looking up the location.');
   const geo = await geocode(cityName + ', ' + countryName);
 
   if (GUEST_MODE) {
@@ -540,7 +553,7 @@ async function saveBudgetTarget(){
 }
 
 /* ---------------- helpers ---------------- */
-const FLAGS={vietnam:'🇻🇳',thailand:'🇹🇭',philippines:'🇵🇭',japan:'🇯🇵',italy:'🇮🇹',france:'🇫🇷',spain:'🇪🇸',greece:'🇬🇷',portugal:'🇵🇹',indonesia:'🇮🇩',india:'🇮🇳',turkey:'🇹🇷',mexico:'🇲🇽',israel:'🇮🇱',germany:'🇩🇪',morocco:'🇲🇦',cambodia:'🇰🇭',malaysia:'🇲🇾',singapore:'🇸🇬',croatia:'🇭🇷',australia:'🇦🇺'};
+const FLAGS={vietnam:'🇻🇳',thailand:'🇹🇭',philippines:'🇵🇭',japan:'🇯🇵',italy:'🇮🇹',france:'🇫🇷',spain:'🇪🇸',greece:'🇬🇷',portugal:'🇵🇹',indonesia:'🇮🇩',india:'🇮🇳',turkey:'🇹🇷',mexico:'🇲🇽',israel:'🇮🇱',germany:'🇩🇪',morocco:'🇲🇦',cambodia:'🇰🇭',malaysia:'🇲🇾',singapore:'🇸🇬',croatia:'🇭🇷',australia:'🇦🇺','sri lanka':'🇱🇰',nepal:'🇳🇵',bali:'🇮🇩',egypt:'🇪🇬',jordan:'🇯🇴',kenya:'🇰🇪',tanzania:'🇹🇿',peru:'🇵🇪',colombia:'🇨🇴',argentina:'🇦🇷',brazil:'🇧🇷',chile:'🇨🇱',china:'🇨🇳','south korea':'🇰🇷',taiwan:'🇹🇼',myanmar:'🇲🇲',laos:'🇱🇦',maldives:'🇲🇻',seychelles:'🇸🇨',iceland:'🇮🇸',norway:'🇳🇴',sweden:'🇸🇪',netherlands:'🇳🇱',switzerland:'🇨🇭',austria:'🇦🇹',czechia:'🇨🇿',hungary:'🇭🇺',poland:'🇵🇱',ukraine:'🇺🇦',georgia:'🇬🇪',armenia:'🇦🇲',uzbekistan:'🇺🇿',vietnam:'🇻🇳',usa:'🇺🇸','united states':'🇺🇸',canada:'🇨🇦',uk:'🇬🇧','united kingdom':'🇬🇧',ireland:'🇮🇪',newzealand:'🇳🇿','new zealand':'🇳🇿',southafrica:'🇿🇦','south africa':'🇿🇦',ethiopia:'🇪🇹',cuba:'🇨🇺',iran:'🇮🇷',oman:'🇴🇲',uae:'🇦🇪','united arab emirates':'🇦🇪'};
 function val(id){ return document.getElementById(id).value; }
 function cap(s){ return (s||'').replace(/\b\w/g,c=>c.toUpperCase()).trim(); }
 function esc(s){ return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
