@@ -4,14 +4,18 @@
 -- ============================================================
 
 create table if not exists flight_research (
-  id          uuid primary key default gen_random_uuid(),
-  trip_id     uuid not null references trips(id) on delete cascade,
-  content     text,
-  image_url   text,
-  link_url    text,
-  link_label  text,
-  created_at  timestamptz not null default now()
+  id                uuid primary key default gen_random_uuid(),
+  trip_id           uuid not null references trips(id) on delete cascade,
+  content           text,
+  image_url         text,
+  extracted_flights jsonb,
+  link_url          text,
+  link_label        text,
+  created_at        timestamptz not null default now()
 );
+
+-- If the table already exists, just add the column:
+alter table flight_research add column if not exists extracted_flights jsonb;
 
 alter table flight_research enable row level security;
 create policy research_all on flight_research for all

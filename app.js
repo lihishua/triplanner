@@ -13,8 +13,9 @@ let expenses = [];
 let budgetTarget = null;
 let research = [];
 let previewMapInstance = null;
-let _researchImageFile = null;
-let _researchImageB64  = null;
+let _researchImageFile     = null;
+let _researchImageB64      = null;
+let _researchExtracted     = null;
 
 /* ---------------- GUEST / LOCAL STORAGE ---------------- */
 const GUEST_TRIP_ID = 'guest';
@@ -618,14 +619,20 @@ function renderResearch() {
     el.innerHTML = '<div class="empty">Nothing saved yet. Add notes, screenshots or links about flights you\'re considering.</div>';
     return;
   }
-  el.innerHTML = research.map(r => `
-    <div class="card research-card">
+  el.innerHTML = research.map(r => {
+    const flights = r.extracted_flights;
+    const imageBlock = flights?.length
+      ? `<div class="ef-header" style="margin-top:0">✦ Extracted flights</div>` + flights.map(renderExtractedFlightCard).join('')
+        + (r.image_url ? `<div style="margin-top:8px"><a class="research-link" href="${esc(r.image_url)}" target="_blank">↗ View original screenshot</a></div>` : '')
+      : r.image_url ? `<img src="${esc(r.image_url)}" class="research-img" onclick="zoomResearchImage('${esc(r.image_url)}')">` : '';
+    return `<div class="card research-card">
       <button class="del" onclick="delResearch('${r.id}')">×</button>
-      ${r.image_url ? `<img src="${esc(r.image_url)}" class="research-img" onclick="zoomResearchImage('${esc(r.image_url)}')">` : ''}
-      ${r.content   ? `<div class="research-text">${esc(r.content)}</div>` : ''}
-      ${r.link_url  ? `<a href="${esc(r.link_url)}" target="_blank" class="research-link">↗ ${esc(r.link_label || r.link_url)}</a>` : ''}
+      ${imageBlock}
+      ${r.content  ? `<div class="research-text">${esc(r.content)}</div>` : ''}
+      ${r.link_url ? `<a href="${esc(r.link_url)}" target="_blank" class="research-link">↗ ${esc(r.link_label || r.link_url)}</a>` : ''}
       <div class="research-date">${new Date(r.created_at).toLocaleDateString()}</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function openResearch() {
@@ -634,8 +641,9 @@ function openResearch() {
   document.getElementById('r-link-label').value = '';
   document.getElementById('r-image-input').value = '';
   document.getElementById('r-image-preview').style.display = 'none';
+  document.getElementById('r-extracted').innerHTML = '';
   document.getElementById('r-msg').textContent = '';
-  _researchImageFile = null; _researchImageB64 = null;
+  _researchImageFile = null; _researchImageB64 = null; _researchExtracted = null;
   openOverlay('ov-research');
 }
 
@@ -667,9 +675,51 @@ function handleResearchImageFile(file) {
   const preview = document.getElementById('r-image-preview');
   preview.src = URL.createObjectURL(file);
   preview.style.display = 'block';
+
   const reader = new FileReader();
-  reader.onload = e => { _researchImageB64 = e.target.result; };
+  reader.onload = e => {
+    _researchImageB64 = e.target.result;
+    analyzeFlightImage(_researchImageB64, file.type || 'image/png');
+  };
   reader.readAsDataURL(file);
+}
+
+async function analyzeFlightImage(dataUrl, mimeType) {
+  if (GUEST_MODE) return; // needs Supabase edge function
+  _researchExtracted = null;
+  const el = document.getElementById('r-extracted');
+  el.innerHTML = '<div class="ef-header ef-analyzing">✦ Analyzing with AI…</div>';
+
+  try {
+    const base64 = dataUrl.split(',')[1];
+    const { data, error } = await sb.functions.invoke('extract-flight', {
+      body: { imageBase64: base64, mediaType: mimeType },
+    });
+    if (error || !data?.flights?.length) {
+      el.innerHTML = '<div class="ef-header" style="color:var(--ink-soft)">Could not extract flights — add notes manually.</div>';
+      return;
+    }
+    _researchExtracted = data.flights;
+    el.innerHTML = '<div class="ef-header">✦ Extracted flights</div>' +
+      data.flights.map(renderExtractedFlightCard).join('');
+  } catch (e) {
+    el.innerHTML = '';
+  }
+}
+
+function renderExtractedFlightCard(f) {
+  const stops = f.stops === 0 ? 'Non-stop'
+    : `${f.stops} stop${f.stops > 1 ? 's' : ''}${f.stop_airports?.length ? ' via ' + f.stop_airports.join(', ') : ''}`;
+  return `<div class="ef-card">
+    <div class="ef-route">${esc(f.from||'')} → ${esc(f.to||'')}${f.date ? ' · ' + esc(f.date) : ''}</div>
+    <div class="ef-meta">
+      <span>${esc(f.airline||'')}${f.codeshare ? ' · ' + esc(f.codeshare) : ''}</span>
+      <span>${esc(f.departure_time||'')} → ${esc(f.arrival_time||'')}</span>
+      <span>${esc(f.duration||'')}</span>
+      <span>${stops}</span>
+    </div>
+    ${f.price_per_person ? `<div class="ef-price">${esc(f.price_per_person)} / person</div>` : ''}
+  </div>`;
 }
 
 async function saveResearch() {
@@ -704,7 +754,8 @@ async function saveResearch() {
 
   const { error } = await sb.from('flight_research').insert({
     trip_id: TRIP_ID, content: content || null,
-    image_url: imageUrl, link_url: linkUrl || null, link_label: linkLabel || null,
+    image_url: imageUrl, extracted_flights: _researchExtracted || null,
+    link_url: linkUrl || null, link_label: linkLabel || null,
   });
   if (error) return rMsg(error.message);
   closeAll(); await refreshAll();
