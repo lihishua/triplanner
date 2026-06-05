@@ -395,12 +395,12 @@
 </div></div>
 
 <!-- Research modal -->
-<div class="overlay" id="ov-research"><div class="modal">
+<div class="overlay" id="ov-research" onpaste="onResearchPaste(event)"><div class="modal">
   <h3>Research note</h3>
   <div class="sub">Save anything useful — notes, a screenshot, or a booking link.</div>
   <label>Notes</label>
   <textarea id="r-content" rows="3" placeholder="e.g. El Al direct TLV→BKK, Nov 15 · $420/person · 11h non-stop"></textarea>
-  <label>Screenshot or image</label>
+  <label>Screenshot or image <span style="font-weight:400;font-style:italic;color:var(--ink-soft)">— upload or paste (⌘V / Ctrl+V)</span></label>
   <input type="file" id="r-image-input" accept="image/*" onchange="onResearchImagePick(this)">
   <img id="r-image-preview">
   <label>Link</label>

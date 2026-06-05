@@ -640,11 +640,29 @@ function openResearch() {
 }
 
 function onResearchImagePick(input) {
-  const file = input.files[0]; if (!file) return;
+  const file = input.files[0];
+  if (file) handleResearchImageFile(file);
+}
+
+function onResearchPaste(e) {
+  const items = e.clipboardData?.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      e.preventDefault();
+      const file = item.getAsFile();
+      if (file) handleResearchImageFile(file);
+      break;
+    }
+  }
+}
+
+function handleResearchImageFile(file) {
   if (file.size > 5 * 1024 * 1024) {
     document.getElementById('r-msg').textContent = 'Image too large (max 5 MB). Try a compressed screenshot.';
-    input.value = ''; return;
+    return;
   }
+  document.getElementById('r-msg').textContent = '';
   _researchImageFile = file;
   const preview = document.getElementById('r-image-preview');
   preview.src = URL.createObjectURL(file);
