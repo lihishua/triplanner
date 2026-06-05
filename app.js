@@ -11,7 +11,7 @@ let cities = [];
 let flights = [];
 let expenses = [];
 let budgetTarget = null;
-let map = null, markers = [];
+let previewMapInstance = null;
 
 /* ---------------- GUEST / LOCAL STORAGE ---------------- */
 const GUEST_TRIP_ID = 'guest';
@@ -285,7 +285,7 @@ async function runCapture() {
   closeAll(); await refreshAll();
 }
 
-/* ---------------- RENDER: COUNTRIES + MAP ---------------- */
+/* ---------------- RENDER: COUNTRIES ---------------- */
 function renderCountries() {
   const el = document.getElementById('countryList');
   if (!countries.length) {
@@ -302,25 +302,6 @@ function renderCountries() {
       </div>`;
     }).join('');
   }
-  drawMap();
-}
-
-function drawMap() {
-  if (!map) {
-    map = L.map('map', { scrollWheelZoom: false }).setView([20, 40], 2);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-      { attribution: '© OpenStreetMap', maxZoom: 18 }).addTo(map);
-  }
-  markers.forEach(m => map.removeLayer(m)); markers = [];
-  const pts = [];
-  cities.filter(c => c.lat && c.lng).forEach(c => {
-    const country = countries.find(co => co.id === c.country_id);
-    const m = L.marker([c.lat, c.lng]).addTo(map)
-      .bindPopup(`<b>${esc(c.name)}</b><br>${esc(country?.name || '')}`);
-    m.on('click', () => openCity(c.id));
-    markers.push(m); pts.push([c.lat, c.lng]);
-  });
-  if (pts.length) map.fitBounds(pts, { padding: [40, 40], maxZoom: 6 });
 }
 
 /* ---------------- COUNTRY + CITY DETAIL ---------------- */
@@ -566,12 +547,168 @@ function esc(s){ return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>
 function showTab(t){
   document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
   document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id==='page-'+t));
-  if(t==='countries') setTimeout(()=>map&&map.invalidateSize(),50);
 }
 function openOverlay(id){ document.getElementById(id).classList.add('show'); }
 function openCapture(){ document.getElementById('cap-text').value=''; document.getElementById('cap-url').value=''; capMsg(''); openOverlay('ov-capture'); }
 function capMsg(m){ document.getElementById('cap-msg').textContent=m; }
 function closeAll(){ document.querySelectorAll('.overlay').forEach(o=>o.classList.remove('show')); }
-document.addEventListener('keydown',e=>{ if(e.key==='Escape')closeAll(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeAll(); closePreview(); } });
+
+/* ---------------- TRIP PREVIEW (Mapbox globe animation) ---------------- */
+
+async function previewTrip() {
+  const sorted = [...flights]
+    .filter(f => f.origin && f.destination)
+    .sort((a, b) => (a.depart_date || '').localeCompare(b.depart_date || ''));
+
+  if (!sorted.length) {
+    alert('Add some flights first — the preview animates your flight route.');
+    return;
+  }
+
+  document.getElementById('ov-preview').classList.add('show');
+  document.getElementById('preview-loading').style.display = 'flex';
+
+  const { MAPBOX_TOKEN } = window.TRIPLANNER_CONFIG;
+  mapboxgl.accessToken = MAPBOX_TOKEN;
+
+  if (previewMapInstance) { previewMapInstance.remove(); previewMapInstance = null; }
+
+  previewMapInstance = new mapboxgl.Map({
+    container: 'preview-map',
+    style: 'mapbox://styles/mapbox/satellite-v9',
+    projection: 'globe',
+    zoom: 1.5,
+    center: [20, 20],
+    interactive: true,
+  });
+
+  await new Promise(resolve => previewMapInstance.on('load', resolve));
+
+  previewMapInstance.setFog({
+    color: 'rgb(186, 210, 235)',
+    'high-color': 'rgb(36, 92, 223)',
+    'horizon-blend': 0.02,
+    'space-color': 'rgb(11, 11, 25)',
+    'star-intensity': 0.6,
+  });
+
+  previewMapInstance.addSource('arc-active', { type: 'geojson', data: geoLineEmpty() });
+  previewMapInstance.addLayer({ id: 'arc-active', type: 'line', source: 'arc-active',
+    paint: { 'line-color': '#c2924a', 'line-width': 2.5, 'line-opacity': 0.95 } });
+
+  previewMapInstance.addSource('arc-done', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  previewMapInstance.addLayer({ id: 'arc-done', type: 'line', source: 'arc-done',
+    paint: { 'line-color': '#c2924a', 'line-width': 1.5, 'line-opacity': 0.35 } });
+
+  const dotEl = document.createElement('div');
+  dotEl.className = 'preview-dot';
+  const dotMarker = new mapboxgl.Marker({ element: dotEl, anchor: 'center' });
+
+  document.getElementById('preview-loading').style.display = 'none';
+
+  const doneFeatures = [];
+
+  for (let i = 0; i < sorted.length; i++) {
+    const flight = sorted[i];
+    const [from, to] = await Promise.all([geocodePlace(flight.origin), geocodePlace(flight.destination)]);
+    if (!from || !to) continue;
+
+    const bounds = [
+      [Math.min(from[0], to[0]) - 12, Math.min(from[1], to[1]) - 12],
+      [Math.max(from[0], to[0]) + 12, Math.max(from[1], to[1]) + 12],
+    ];
+    previewMapInstance.fitBounds(bounds, { padding: 90, duration: 1400, maxZoom: 5 });
+    await sleep(1700);
+
+    dotMarker.setLngLat(from).addTo(previewMapInstance);
+
+    const arc = buildArc(from, to);
+    await animateArc(arc, dotMarker);
+
+    doneFeatures.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: arc } });
+    previewMapInstance.getSource('arc-done').setData({ type: 'FeatureCollection', features: doneFeatures });
+    previewMapInstance.getSource('arc-active').setData(geoLineEmpty());
+
+    showPreviewCard(flight, i + 1, sorted.length);
+    await sleep(2800);
+    hidePreviewCard();
+    await sleep(300);
+  }
+
+  dotMarker.remove();
+  previewMapInstance.flyTo({ zoom: 1.6, center: [20, 20], duration: 2000 });
+  await sleep(2100);
+  showPreviewCard(null, sorted.length, sorted.length, true);
+}
+
+function closePreview() {
+  document.getElementById('ov-preview').classList.remove('show');
+  hidePreviewCard();
+  if (previewMapInstance) { previewMapInstance.remove(); previewMapInstance = null; }
+}
+
+function buildArc(from, to, steps = 120) {
+  const pts = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    pts.push([from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t]);
+  }
+  return pts;
+}
+
+function animateArc(arcPts, dotMarker) {
+  return new Promise(resolve => {
+    let step = 1;
+    const id = setInterval(() => {
+      if (!previewMapInstance) { clearInterval(id); resolve(); return; }
+      previewMapInstance.getSource('arc-active').setData({
+        type: 'Feature', geometry: { type: 'LineString', coordinates: arcPts.slice(0, step) }
+      });
+      dotMarker.setLngLat(arcPts[step - 1]);
+      step++;
+      if (step > arcPts.length) { clearInterval(id); resolve(); }
+    }, 16);
+  });
+}
+
+async function geocodePlace(q) {
+  const found = cities.find(c =>
+    c.name.toLowerCase().includes(q.toLowerCase()) || q.toLowerCase().includes(c.name.toLowerCase())
+  );
+  if (found?.lat && found?.lng) return [found.lng, found.lat];
+  try {
+    const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(q));
+    const j = await r.json();
+    if (j[0]) return [+j[0].lon, +j[0].lat];
+  } catch (e) {}
+  return null;
+}
+
+function geoLineEmpty() { return { type: 'Feature', geometry: { type: 'LineString', coordinates: [] } }; }
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function showPreviewCard(flight, index, total, summary = false) {
+  const card = document.getElementById('preview-card');
+  if (summary) {
+    card.innerHTML = `<div class="pc-label">${esc(String(total))} ${total === 1 ? 'flight' : 'flights'} · your full route ✈</div>`;
+  } else {
+    const month = flight.depart_date
+      ? new Date(flight.depart_date + 'T12:00:00').toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+      : '';
+    card.innerHTML = `
+      <div class="pc-step">${index} of ${total}</div>
+      <div class="pc-route">${esc(flight.origin)} → ${esc(flight.destination)}</div>
+      ${flight.airline ? `<div class="pc-detail">${esc(flight.airline)}${flight.flight_no ? ' · ' + esc(flight.flight_no) : ''}</div>` : ''}
+      ${month ? `<div class="pc-detail">✈ ${month}</div>` : ''}
+      ${flight.price ? `<div class="pc-price">${esc(flight.price)}</div>` : ''}
+    `;
+  }
+  card.classList.add('show');
+}
+
+function hidePreviewCard() {
+  document.getElementById('preview-card').classList.remove('show');
+}
 
 init();
