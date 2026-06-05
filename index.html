@@ -109,6 +109,10 @@
   .row{display:flex;gap:12px}.row>*{flex:1}
   .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
   #cap-msg{color:var(--accent);font-size:14px;min-height:18px;margin-top:8px}
+  #cap-country-suggestions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .suggestion-chip{font-family:'Fraunces',serif;font-size:13px;padding:5px 13px;border-radius:16px;
+    border:1px solid var(--line);background:var(--paper);cursor:pointer;transition:all .15s}
+  .suggestion-chip:hover{border-color:var(--accent);color:var(--accent)}
 
   .row-item{display:flex;justify-content:space-between;align-items:center;padding:13px 4px;
     border-bottom:1px solid var(--line);cursor:pointer;font-size:17px}
@@ -270,9 +274,14 @@
 <!-- Capture modal -->
 <div class="overlay" id="ov-capture"><div class="modal">
   <h3>Capture a place</h3>
-  <div class="sub">Type the place (and country). Paste the Instagram link too if you have it.</div>
   <label>Place</label>
-  <input id="cap-text" placeholder="Hoi An, Vietnam">
+  <input id="cap-place" placeholder="Hoi An" oninput="onPlaceInput()" autocomplete="off">
+  <label style="display:flex;align-items:center;gap:6px">
+    Country
+    <span id="cap-country-status" style="font-family:'Newsreader',serif;font-weight:400;font-style:italic;color:var(--ink-soft);font-size:13px"></span>
+  </label>
+  <input id="cap-country" placeholder="auto-detected · or type manually" autocomplete="off">
+  <div id="cap-country-suggestions"></div>
   <label>Link (optional)</label>
   <input id="cap-url" placeholder="https://instagram.com/...">
   <div id="cap-msg"></div>

@@ -248,37 +248,67 @@ async function geocode(q) {
   return { lat: null, lng: null };
 }
 
-/* ---------------- CAPTURE (instagram link → city → country) ---------------- */
-async function runCapture() {
-  const text = val('cap-text').trim();
-  const url  = val('cap-url').trim();
-  if (!text) return capMsg('Type at least the place, e.g. "Hoi An, Vietnam".');
+/* ---------------- CAPTURE (place → auto-detect country) ---------------- */
+let _placeDebounce = null;
 
-  let cityName = text, countryName = '';
-  if (text.includes(',')) {
-    [cityName, countryName] = text.split(',').map(s => s.trim());
-  } else {
-    // Check if the whole text is a known country name
-    const exactCountry = Object.keys(FLAGS).find(k => k === text.toLowerCase());
-    if (exactCountry) {
-      countryName = cap(exactCountry);
-      cityName = ''; // country-only entry
+function onPlaceInput() {
+  clearTimeout(_placeDebounce);
+  const place = document.getElementById('cap-place').value.trim();
+  if (place.length < 2) return;
+  document.getElementById('cap-country-status').textContent = 'detecting…';
+  _placeDebounce = setTimeout(() => autoDetectCountry(place), 600);
+}
+
+async function autoDetectCountry(place) {
+  try {
+    const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=6&q='
+      + encodeURIComponent(place) + '&addressdetails=1');
+    const results = await r.json();
+    document.getElementById('cap-country-status').textContent = '';
+
+    const seen = new Set();
+    const options = results
+      .map(r => r.address?.country)
+      .filter(c => c && !seen.has(c) && seen.add(c));
+
+    if (!options.length) return;
+
+    if (options.length === 1) {
+      document.getElementById('cap-country').value = options[0];
+      document.getElementById('cap-country-suggestions').innerHTML = '';
     } else {
-      const known = Object.keys(FLAGS).find(k => text.toLowerCase().includes(k));
-      if (known) { countryName = cap(known); cityName = text.replace(new RegExp(known,'i'),'').trim(); }
+      document.getElementById('cap-country-suggestions').innerHTML =
+        options.map(c =>
+          `<button class="suggestion-chip" onclick="pickCountry('${esc(c)}')">${FLAGS[c.toLowerCase()]||'🌍'} ${esc(c)}</button>`
+        ).join('');
     }
+  } catch (e) {
+    document.getElementById('cap-country-status').textContent = '';
   }
-  // If still no country, treat the whole thing as country-only (user knows what they typed)
-  if (!countryName) { countryName = cap(text); cityName = ''; }
+}
+
+function pickCountry(name) {
+  document.getElementById('cap-country').value = name;
+  document.getElementById('cap-country-suggestions').innerHTML = '';
+}
+
+async function runCapture() {
+  const cityName    = document.getElementById('cap-place').value.trim();
+  const countryName = document.getElementById('cap-country').value.trim();
+  const url         = val('cap-url').trim();
+
+  if (!cityName) return capMsg('Enter a place name.');
+
+  const isCountryOnly = !countryName || cityName.toLowerCase() === countryName.toLowerCase();
+  const effectiveCountry = countryName || cityName;
 
   capMsg('Filing…');
-  const country = await ensureCountry(cap(countryName), FLAGS[countryName.toLowerCase()] || '🌍');
+  const country = await ensureCountry(cap(effectiveCountry), FLAGS[effectiveCountry.toLowerCase()] || '🌍');
   if (!country) return;
 
-  // Country-only entry — no city to add
-  if (!cityName) { closeAll(); await refreshAll(); return; }
+  if (isCountryOnly) { closeAll(); await refreshAll(); return; }
 
-  capMsg('Filing… looking up the location.');
+  capMsg('Looking up location…');
   const geo = await geocode(cityName + ', ' + countryName);
 
   if (GUEST_MODE) {
@@ -562,7 +592,15 @@ function showTab(t){
   document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id==='page-'+t));
 }
 function openOverlay(id){ document.getElementById(id).classList.add('show'); }
-function openCapture(){ document.getElementById('cap-text').value=''; document.getElementById('cap-url').value=''; capMsg(''); openOverlay('ov-capture'); }
+function openCapture(){
+  document.getElementById('cap-place').value='';
+  document.getElementById('cap-country').value='';
+  document.getElementById('cap-url').value='';
+  document.getElementById('cap-country-suggestions').innerHTML='';
+  document.getElementById('cap-country-status').textContent='';
+  capMsg('');
+  openOverlay('ov-capture');
+}
 function capMsg(m){ document.getElementById('cap-msg').textContent=m; }
 function closeAll(){ document.querySelectorAll('.overlay').forEach(o=>o.classList.remove('show')); }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeAll(); closePreview(); } });
