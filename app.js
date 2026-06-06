@@ -353,6 +353,68 @@ function renderCountries() {
       </div>`;
     }).join('');
   }
+  renderPlacesToBe();
+}
+
+/* ---------------- PLACES TO BE ---------------- */
+function renderPlacesToBe() {
+  const el = document.getElementById('ptb-list');
+  if (!el) return;
+  if (!cities.length) {
+    el.innerHTML = '<div class="empty" style="margin-bottom:16px">No places added yet.</div>';
+    return;
+  }
+  const total = cities.reduce((s, c) => s + (c.planned_days || 0), 0);
+  el.innerHTML = cities.map(c => {
+    const country = countries.find(co => co.id === c.country_id);
+    return `<div class="ptb-row">
+      <span class="ptb-place">📍 ${esc(c.name)}</span>
+      <span class="ptb-country">${esc(country?.flag || '')} ${esc(country?.name || '')}</span>
+      <div class="ptb-days">
+        <input type="number" class="ptb-days" min="1" max="365"
+          value="${c.planned_days || ''}" placeholder="?"
+          onchange="savePlannedStay('${c.id}', this.value)">
+        <span class="ptb-unit">days</span>
+      </div>
+    </div>`;
+  }).join('') + (total > 0
+    ? `<div class="ptb-total">Total: <b>${total} days</b> planned</div>`
+    : '');
+}
+
+async function savePlannedStay(cityId, val) {
+  const days = parseInt(val) || null;
+  const city = cities.find(c => c.id === cityId);
+  if (!city) return;
+  city.planned_days = days;
+  renderPlacesToBe();
+  if (GUEST_MODE) { lsUpdate('cities', cityId, { planned_days: days }); return; }
+  await sb.from('cities').update({ planned_days: days }).eq('id', cityId);
+}
+
+async function suggestItinerary() {
+  const out = document.getElementById('ptb-ai-out');
+  out.textContent = 'Thinking…';
+  const placesData = cities.map(c => {
+    const country = countries.find(co => co.id === c.country_id);
+    return { name: c.name, country: country?.name || '', planned_days: c.planned_days || null };
+  });
+  const flightsData = flights.map(f => ({
+    from: f.origin, to: f.destination, date: f.depart_date,
+    airline: f.airline, price: f.price,
+  }));
+  try {
+    const { data, error } = await sb.functions.invoke('plan-trip', {
+      body: { places: placesData, flights: flightsData },
+    });
+    if (error || !data?.suggestion) {
+      out.textContent = error?.message || 'Could not get a suggestion. Deploy the plan-trip function first.';
+      return;
+    }
+    out.textContent = data.suggestion;
+  } catch (e) {
+    out.textContent = 'Error: ' + String(e);
+  }
 }
 
 /* ---------------- COUNTRY + CITY DETAIL ---------------- */
@@ -377,6 +439,15 @@ async function openCity(id) {
   body.innerHTML = `
     <div id="wx" class="wx">Loading weather…</div>
     ${c.source_url ? `<a class="srclink" href="${esc(c.source_url)}" target="_blank">↗ open saved link</a>` : ''}
+    <div style="display:flex;align-items:center;gap:10px;margin:12px 0;padding:12px 14px;
+      background:var(--accent-soft);border-radius:12px">
+      <span style="font-family:'Fraunces',serif;font-size:14px;color:var(--ink-soft);flex:1">Planning to stay</span>
+      <input type="number" id="city-stay-input" min="1" max="365"
+        value="${c.planned_days || ''}" placeholder="—"
+        style="width:60px;text-align:center;font-size:15px;padding:5px 8px;border:1px solid var(--line);border-radius:8px"
+        onchange="savePlannedStay('${c.id}', this.value)">
+      <span style="color:var(--ink-soft);font-size:14px">days</span>
+    </div>
     <div class="ai-block">
       <div class="ai-head">
         <span>What to do here</span>
