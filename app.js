@@ -622,7 +622,7 @@ function renderResearch() {
   el.innerHTML = research.map(r => {
     const flights = r.extracted_flights;
     const imageBlock = flights?.length
-      ? `<div class="ef-header" style="margin-top:0">✦ Extracted flights</div>` + flights.map(renderExtractedFlightCard).join('')
+      ? `<div class="ef-header" style="margin-top:0">✦ Extracted flights</div>` + flights.map((f, i) => renderExtractedFlightCard(f, r.id, i)).join('')
         + (r.image_url ? `<div style="margin-top:8px"><a class="research-link" href="${esc(r.image_url)}" target="_blank">↗ View original screenshot</a></div>` : '')
       : r.image_url ? `<img src="${esc(r.image_url)}" class="research-img" onclick="zoomResearchImage('${esc(r.image_url)}')">` : '';
     return `<div class="card research-card">
@@ -728,10 +728,14 @@ async function analyzeFlightImage(dataUrl, mimeType) {
   }
 }
 
-function renderExtractedFlightCard(f) {
+function renderExtractedFlightCard(f, researchId = null, idx = null) {
   const stops = f.stops === 0 ? 'Non-stop'
     : `${f.stops} stop${f.stops > 1 ? 's' : ''}${f.stop_airports?.length ? ' via ' + f.stop_airports.join(', ') : ''}`;
-  return `<div class="ef-card">
+  const delBtn = researchId !== null && idx !== null
+    ? `<button class="ef-del" onclick="deleteExtractedFlight('${researchId}',${idx})">×</button>`
+    : '';
+  return `<div class="ef-card" style="position:relative">
+    ${delBtn}
     <div class="ef-route">${esc(f.from||'')} → ${esc(f.to||'')}${f.date ? ' · ' + esc(f.date) : ''}</div>
     <div class="ef-meta">
       <span>${esc(f.airline||'')}${f.codeshare ? ' · ' + esc(f.codeshare) : ''}</span>
@@ -741,6 +745,21 @@ function renderExtractedFlightCard(f) {
     </div>
     ${f.price_per_person ? `<div class="ef-price">${esc(f.price_per_person)} / person</div>` : ''}
   </div>`;
+}
+
+async function deleteExtractedFlight(researchId, idx) {
+  const item = research.find(r => r.id === researchId);
+  if (!item?.extracted_flights) return;
+  const updated = item.extracted_flights.filter((_, i) => i !== idx);
+  if (GUEST_MODE) {
+    lsUpdate('flight_research', researchId, { extracted_flights: updated });
+    research = lsGet('flight_research').filter(r => r.trip_id === TRIP_ID)
+      .sort((a,b) => b.created_at.localeCompare(a.created_at));
+    renderResearch(); return;
+  }
+  await sb.from('flight_research').update({ extracted_flights: updated }).eq('id', researchId);
+  item.extracted_flights = updated;
+  renderResearch();
 }
 
 async function saveResearch() {
