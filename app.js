@@ -734,6 +734,9 @@ function renderExtractedFlightCard(f, researchId = null, idx = null) {
   const delBtn = researchId !== null && idx !== null
     ? `<button class="ef-del" onclick="deleteExtractedFlight('${researchId}',${idx})">×</button>`
     : '';
+  const addBtn = researchId !== null && idx !== null
+    ? `<button class="ef-add-btn" onclick="addResearchFlightToTrip('${researchId}',${idx},this)">＋ Add to trip</button>`
+    : '';
   return `<div class="ef-card" style="position:relative">
     ${delBtn}
     <div class="ef-route">${esc(f.from||'')} → ${esc(f.to||'')}${f.date ? ' · ' + esc(f.date) : ''}</div>
@@ -744,7 +747,48 @@ function renderExtractedFlightCard(f, researchId = null, idx = null) {
       <span>${stops}</span>
     </div>
     ${f.price_per_person ? `<div class="ef-price">${esc(f.price_per_person)} / person</div>` : ''}
+    ${addBtn}
   </div>`;
+}
+
+async function addResearchFlightToTrip(researchId, idx, btn) {
+  const item = research.find(r => r.id === researchId);
+  const f = item?.extracted_flights?.[idx];
+  if (!f) return;
+
+  const noteParts = [
+    f.duration   ? `${f.duration}` : '',
+    f.stops === 0 ? 'Non-stop' : f.stops ? `${f.stops} stop(s)${f.stop_airports?.length ? ' via ' + f.stop_airports.join(', ') : ''}` : '',
+    f.codeshare  || '',
+    f.arrival_time ? `Arrives ${f.arrival_time}` : '',
+  ].filter(Boolean);
+
+  const row = {
+    trip_id:    TRIP_ID,
+    origin:     f.from        || '',
+    destination:f.to          || '',
+    airline:    f.airline     || '',
+    flight_no:  null,
+    depart_date:f.date        || '',
+    depart_time:f.departure_time || '',
+    price:      f.price_per_person || '',
+    notes:      noteParts.join(' · ') || null,
+  };
+
+  if (GUEST_MODE) {
+    lsInsert('flights', row);
+    flights = lsGet('flights').filter(r => r.trip_id === TRIP_ID);
+    renderFlights();
+  } else {
+    const { error } = await sb.from('flights').insert(row);
+    if (error) { alert(error.message); return; }
+    const { data } = await sb.from('flights').select('*').order('created_at');
+    flights = data || [];
+    renderFlights();
+  }
+
+  btn.textContent = '✓ Added to trip';
+  btn.disabled = true;
 }
 
 async function deleteExtractedFlight(researchId, idx) {
