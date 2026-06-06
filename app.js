@@ -684,26 +684,47 @@ function handleResearchImageFile(file) {
   reader.readAsDataURL(file);
 }
 
+async function compressImage(dataUrl) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const maxW = 1280;
+      const scale = Math.min(1, maxW / img.width);
+      canvas.width  = Math.round(img.width  * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.82));
+    };
+    img.src = dataUrl;
+  });
+}
+
 async function analyzeFlightImage(dataUrl, mimeType) {
-  if (GUEST_MODE) return; // needs Supabase edge function
+  if (GUEST_MODE) return;
   _researchExtracted = null;
   const el = document.getElementById('r-extracted');
   el.innerHTML = '<div class="ef-header ef-analyzing">✦ Analyzing with AI…</div>';
 
   try {
-    const base64 = dataUrl.split(',')[1];
+    const compressed = await compressImage(dataUrl);
+    const base64 = compressed.split(',')[1];
     const { data, error } = await sb.functions.invoke('extract-flight', {
-      body: { imageBase64: base64, mediaType: mimeType },
+      body: { imageBase64: base64, mediaType: 'image/jpeg' },
     });
-    if (error || !data?.flights?.length) {
-      el.innerHTML = '<div class="ef-header" style="color:var(--ink-soft)">Could not extract flights — add notes manually.</div>';
+    if (error) {
+      el.innerHTML = `<div class="ef-header" style="color:#b4544a">Analysis failed: ${esc(error.message || JSON.stringify(error))}</div>`;
+      return;
+    }
+    if (!data?.flights?.length) {
+      el.innerHTML = '<div class="ef-header" style="color:var(--ink-soft)">No flights found in image — add notes manually.</div>';
       return;
     }
     _researchExtracted = data.flights;
     el.innerHTML = '<div class="ef-header">✦ Extracted flights</div>' +
       data.flights.map(renderExtractedFlightCard).join('');
   } catch (e) {
-    el.innerHTML = '';
+    el.innerHTML = `<div class="ef-header" style="color:#b4544a">Error: ${esc(String(e))}</div>`;
   }
 }
 
