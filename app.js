@@ -304,9 +304,10 @@ async function runCapture() {
   const countryName = document.getElementById('cap-country').value.trim();
   const url         = val('cap-url').trim();
 
-  if (!cityName) return capMsg('Enter a place name.');
+  if (!cityName && !countryName) return capMsg('Enter a place or country name.');
 
-  const isCountryOnly = !countryName || cityName.toLowerCase() === countryName.toLowerCase();
+  // Country-only: Place is empty, or Place matches Country
+  const isCountryOnly = !cityName || (countryName && cityName.toLowerCase() === countryName.toLowerCase());
   const effectiveCountry = countryName || cityName;
 
   capMsg('Filing…');
