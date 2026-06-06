@@ -875,10 +875,40 @@ function zoomResearchImage(url) {
 
 /* ---------------- TRIP PREVIEW (Mapbox globe animation) ---------------- */
 
+function chainFlightsAsRoute(fs) {
+  if (fs.length <= 1) return fs;
+
+  const norm = s => (s || '').toLowerCase().trim();
+
+  // Try date sort first as a baseline
+  const byDate = [...fs].sort((a, b) => (a.depart_date || '').localeCompare(b.depart_date || ''));
+
+  // Find the leg whose origin is not the destination of any other leg
+  const allDests = new Set(fs.map(f => norm(f.destination)));
+  const starts   = byDate.filter(f => !allDests.has(norm(f.origin)));
+  const seed     = starts.length ? starts[0] : byDate[0];
+
+  const chain     = [seed];
+  const remaining = byDate.filter(f => f !== seed);
+
+  while (remaining.length) {
+    const last = chain[chain.length - 1];
+    const idx  = remaining.findIndex(f => norm(f.origin) === norm(last.destination));
+    if (idx !== -1) {
+      chain.push(remaining.splice(idx, 1)[0]);
+    } else {
+      // No direct connection — append the rest in date order
+      chain.push(...remaining.splice(0));
+    }
+  }
+
+  return chain;
+}
+
 async function previewTrip() {
-  const sorted = [...flights]
-    .filter(f => f.origin && f.destination)
-    .sort((a, b) => (a.depart_date || '').localeCompare(b.depart_date || ''));
+  const sorted = chainFlightsAsRoute(
+    flights.filter(f => f.origin && f.destination)
+  );
 
   if (!sorted.length) {
     alert('Add some flights first — the preview animates your flight route.');
