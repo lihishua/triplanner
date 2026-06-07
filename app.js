@@ -391,8 +391,7 @@ function openCountry(id) {
     <div class="country-days-row">
       <span style="flex:1">Planning to spend</span>
       <input type="number" min="1" max="365" value="${c.planned_days || ''}" placeholder="?"
-        class="country-days-row input"
-        style="width:60px;text-align:center;font-size:15px;padding:5px 8px;border:1px solid var(--line);border-radius:8px"
+        style="width:60px;text-align:center;font-size:15px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;flex-shrink:0"
         onchange="saveCountryDays('${c.id}', this.value)">
       <span>days here</span>
     </div>
@@ -1174,8 +1173,8 @@ async function previewTrip() {
       [Math.min(from[0], to[0]) - 12, Math.min(from[1], to[1]) - 12],
       [Math.max(from[0], to[0]) + 12, Math.max(from[1], to[1]) + 12],
     ];
-    previewMapInstance.fitBounds(bounds, { padding: 90, duration: 1400, maxZoom: 5 });
-    await sleep(1700);
+    previewMapInstance.fitBounds(bounds, { padding: 90, duration: 900, maxZoom: 5 });
+    await sleep(1050);
 
     dotMarker.setLngLat(from).addTo(previewMapInstance);
 
@@ -1187,14 +1186,14 @@ async function previewTrip() {
     previewMapInstance.getSource('arc-active').setData(geoLineEmpty());
 
     showPreviewCard(flight, i + 1, sorted.length);
-    await sleep(2800);
+    await sleep(1800);
     hidePreviewCard();
-    await sleep(300);
+    await sleep(200);
   }
 
   dotMarker.remove();
-  previewMapInstance.flyTo({ zoom: 1.6, center: [20, 20], duration: 2000 });
-  await sleep(2100);
+  previewMapInstance.flyTo({ zoom: 1.6, center: [20, 20], duration: 1500 });
+  await sleep(1600);
   showPreviewCard(null, sorted.length, sorted.length, true);
 }
 
@@ -1204,11 +1203,18 @@ function closePreview() {
   if (previewMapInstance) { previewMapInstance.remove(); previewMapInstance = null; }
 }
 
-function buildArc(from, to, steps = 120) {
+function buildArc(from, to, steps = 100) {
+  // Always take the shorter path: adjust longitude delta to stay within ±180°
+  let dLng = to[0] - from[0];
+  if (dLng > 180)  dLng -= 360;
+  if (dLng < -180) dLng += 360;
   const pts = [];
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
-    pts.push([from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t]);
+    let lng = from[0] + dLng * t;
+    if (lng > 180)  lng -= 360;
+    if (lng < -180) lng += 360;
+    pts.push([lng, from[1] + (to[1] - from[1]) * t]);
   }
   return pts;
 }
@@ -1224,15 +1230,26 @@ function animateArc(arcPts, dotMarker) {
       dotMarker.setLngLat(arcPts[step - 1]);
       step++;
       if (step > arcPts.length) { clearInterval(id); resolve(); }
-    }, 16);
+    }, 10);
   });
 }
 
 async function geocodePlace(q) {
-  const found = cities.find(c =>
-    c.name.toLowerCase().includes(q.toLowerCase()) || q.toLowerCase().includes(c.name.toLowerCase())
-  );
+  const ql = q.toLowerCase().trim();
+  // 1. Match existing trip cities
+  const found = cities.find(c => c.name.toLowerCase().includes(ql) || ql.includes(c.name.toLowerCase()));
   if (found?.lat && found?.lng) return [found.lng, found.lat];
+  // 2. Match AIRPORTS list (IATA code or city name) — prevents wrong-country Nominatim matches
+  const ap = AIRPORTS.find(a => a[0].toLowerCase() === ql || a[1].toLowerCase() === ql);
+  if (ap) {
+    try {
+      const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='
+        + encodeURIComponent(ap[1] + ' ' + ap[3]));
+      const j = await r.json();
+      if (j[0]) return [+j[0].lon, +j[0].lat];
+    } catch (e) {}
+  }
+  // 3. Nominatim fallback
   try {
     const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(q));
     const j = await r.json();
