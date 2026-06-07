@@ -7,7 +7,7 @@ let TRIP_ID = null;
 let GUEST_MODE = false;
 let myTrips = [];
 let countries = [];
-let cities = [];
+let places = [];
 let flights = [];
 let expenses = [];
 let budgetTarget = null;
@@ -201,12 +201,12 @@ function tripsModalMsg(m) { document.getElementById('trips-modal-msg').textConte
 async function refreshAll() {
   if (GUEST_MODE) {
     const allCountries = lsGet('countries');
-    const allCities    = lsGet('cities');
+    const allCities    = lsGet('places');
     const allFlights   = lsGet('flights');
     const allExpenses  = lsGet('expenses');
     const allBudget    = lsGet('budget_settings');
     countries    = allCountries.filter(r => r.trip_id === TRIP_ID);
-    cities       = allCities.filter(r => r.trip_id === TRIP_ID);
+    places       = allCities.filter(r => r.trip_id === TRIP_ID);
     flights      = allFlights.filter(r => r.trip_id === TRIP_ID);
     expenses     = allExpenses.filter(r => r.trip_id === TRIP_ID)
                               .sort((a,b) => (b.spent_on||'').localeCompare(a.spent_on||''));
@@ -218,13 +218,13 @@ async function refreshAll() {
   }
   const [c, ci, f, ex, bs, res] = await Promise.all([
     sb.from('countries').select('*').order('created_at'),
-    sb.from('cities').select('*').order('created_at'),
+    sb.from('places').select('*').order('created_at'),
     sb.from('flights').select('*').order('created_at'),
     sb.from('expenses').select('*').order('spent_on', { ascending: false }),
     sb.from('budget_settings').select('*').eq('trip_id', TRIP_ID).maybeSingle(),
     sb.from('flight_research').select('*').eq('trip_id', TRIP_ID).order('created_at', { ascending: false }),
   ]);
-  countries = c.data || []; cities = ci.data || []; flights = f.data || [];
+  countries = c.data || []; places = ci.data || []; flights = f.data || [];
   expenses = ex.data || []; budgetTarget = bs.data || null; research = res.data || [];
   renderCountries(); renderFlights(); renderResearch(); renderBudget();
 }
@@ -320,7 +320,7 @@ async function runCapture() {
   const geo = await geocode(cityName + ', ' + countryName);
 
   if (GUEST_MODE) {
-    lsInsert('cities', {
+    lsInsert('places', {
       trip_id: TRIP_ID, country_id: country.id, name: cap(cityName),
       lat: geo.lat, lng: geo.lng, source_url: url || null,
     });
@@ -328,7 +328,7 @@ async function runCapture() {
     return;
   }
 
-  const { error } = await sb.from('cities').insert({
+  const { error } = await sb.from('places').insert({
     trip_id: TRIP_ID, country_id: country.id, name: cap(cityName),
     lat: geo.lat, lng: geo.lng, source_url: url || null,
   });
@@ -344,7 +344,7 @@ function renderCountries() {
       + 'Use "Capture" with something like "Hoi An, Vietnam".</div>';
   } else {
     el.innerHTML = countries.map(c => {
-      const n = cities.filter(ci => ci.country_id === c.id).length;
+      const n = places.filter(ci => ci.country_id === c.id).length;
       const daysLabel = c.planned_days ? ` · ${c.planned_days} days` : '';
       return `<div class="card country-card" onclick="openCountry('${c.id}')">
         <div class="country-flag">${esc(c.flag) || '🌍'}</div>
@@ -360,7 +360,7 @@ async function suggestItinerary() {
   document.getElementById('plan-ai-out').textContent = 'Asking Claude…';
   const placesData = countries.map(c => ({
     name: c.name, planned_days: c.planned_days || null,
-    places: cities.filter(ci => ci.country_id === c.id)
+    places: places.filter(ci => ci.country_id === c.id)
       .map(ci => ({ name: ci.name, planned_days: ci.planned_days || null })),
   }));
   const flightsData = flights.map(f => ({
@@ -382,7 +382,7 @@ async function suggestItinerary() {
 /* ---------------- COUNTRY + CITY DETAIL ---------------- */
 function openCountry(id) {
   const c = countries.find(x => x.id === id); if (!c) return;
-  const places = cities.filter(ci => ci.country_id === id);
+  const places = places.filter(ci => ci.country_id === id);
   const placeTotal = places.reduce((s, p) => s + (p.planned_days || 0), 0);
   const over = c.planned_days && placeTotal > c.planned_days;
 
@@ -442,11 +442,11 @@ async function saveCountryDays(countryId, val) {
 
 async function savePlaceTime(placeId, countryId, val) {
   const days = parseFloat(val) || null;
-  const place = cities.find(c => c.id === placeId);
+  const place = places.find(c => c.id === placeId);
   if (!place) return;
   place.planned_days = days;
-  if (GUEST_MODE) { lsUpdate('cities', placeId, { planned_days: days }); }
-  else await sb.from('cities').update({ planned_days: days }).eq('id', placeId);
+  if (GUEST_MODE) { lsUpdate('places', placeId, { planned_days: days }); }
+  else await sb.from('places').update({ planned_days: days }).eq('id', placeId);
   openCountry(countryId);
 }
 
@@ -457,27 +457,27 @@ async function addPlaceToCountry(countryId) {
   const country = countries.find(c => c.id === countryId);
   const geo = await geocode(name + (country ? ', ' + country.name : ''));
   if (GUEST_MODE) {
-    const newPlace = lsInsert('cities', { trip_id: TRIP_ID, country_id: countryId, name: cap(name), lat: geo.lat, lng: geo.lng });
-    cities.push(newPlace);
+    const newPlace = lsInsert('places', { trip_id: TRIP_ID, country_id: countryId, name: cap(name), lat: geo.lat, lng: geo.lng });
+    places.push(newPlace);
   } else {
-    const { data, error } = await sb.from('cities')
+    const { data, error } = await sb.from('places')
       .insert({ trip_id: TRIP_ID, country_id: countryId, name: cap(name), lat: geo.lat, lng: geo.lng })
       .select().single();
     if (error) { alert(error.message); return; }
-    cities.push(data);
+    places.push(data);
   }
   openCountry(countryId);
 }
 
 async function deletePlace(placeId, countryId) {
-  cities = cities.filter(c => c.id !== placeId);
-  if (GUEST_MODE) { lsDelete('cities', placeId); }
-  else await sb.from('cities').delete().eq('id', placeId);
+  places = places.filter(c => c.id !== placeId);
+  if (GUEST_MODE) { lsDelete('places', placeId); }
+  else await sb.from('places').delete().eq('id', placeId);
   openCountry(countryId);
 }
 
 async function openCity(id) {
-  const c = cities.find(x => x.id === id); if (!c) return;
+  const c = places.find(x => x.id === id); if (!c) return;
   const country = countries.find(co => co.id === c.country_id);
   document.getElementById('detailTitle').textContent = '📍 ' + c.name;
   const body = document.getElementById('detailBody');
@@ -529,7 +529,7 @@ function wxIcon(code) {
 
 /* ---------------- AI INVESTIGATE (via edge function) ---------------- */
 async function investigate(cityId) {
-  const c = cities.find(x => x.id === cityId);
+  const c = places.find(x => x.id === cityId);
   const country = countries.find(co => co.id === c.country_id);
   const out = document.getElementById('ai-out');
   if (GUEST_MODE) {
@@ -544,7 +544,7 @@ async function investigate(cityId) {
     if (error) throw error;
     if (data.error) { out.textContent = data.error; return; }
     out.textContent = data.text;
-    await sb.from('cities').update({ ai_notes: data.text }).eq('id', cityId);
+    await sb.from('places').update({ ai_notes: data.text }).eq('id', cityId);
     c.ai_notes = data.text;
   } catch (e) {
     out.textContent = 'AI not reachable yet. Make sure the "investigate" function is '
@@ -1236,8 +1236,8 @@ function animateArc(arcPts, dotMarker) {
 
 async function geocodePlace(q) {
   const ql = q.toLowerCase().trim();
-  // 1. Match existing trip cities
-  const found = cities.find(c => c.name.toLowerCase().includes(ql) || ql.includes(c.name.toLowerCase()));
+  // 1. Match existing trip places
+  const found = places.find(c => c.name.toLowerCase().includes(ql) || ql.includes(c.name.toLowerCase()));
   if (found?.lat && found?.lng) return [found.lng, found.lat];
   // 2. Match AIRPORTS list (IATA code or city name) — prevents wrong-country Nominatim matches
   const ap = AIRPORTS.find(a => a[0].toLowerCase() === ql || a[1].toLowerCase() === ql);

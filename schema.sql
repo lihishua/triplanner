@@ -30,8 +30,8 @@ create table if not exists countries (
   created_at  timestamptz not null default now()
 );
 
--- ---------- cities (pins on the map) ----------
-create table if not exists cities (
+-- ---------- places (pins on the map) ----------
+create table if not exists places (
   id          uuid primary key default gen_random_uuid(),
   country_id  uuid not null references countries(id) on delete cascade,
   trip_id     uuid not null references trips(id) on delete cascade,
@@ -66,7 +66,7 @@ create table if not exists flights (
 alter table trips         enable row level security;
 alter table trip_members  enable row level security;
 alter table countries     enable row level security;
-alter table cities        enable row level security;
+alter table places        enable row level security;
 alter table flights       enable row level security;
 
 -- helper: is the current user a member of this trip?
@@ -88,7 +88,7 @@ create policy members_select on trip_members for select using ( is_trip_member(t
 -- data tables: full access for members of the owning trip
 create policy countries_all on countries for all
   using ( is_trip_member(trip_id) ) with check ( is_trip_member(trip_id) );
-create policy cities_all on cities for all
+create policy places_all on places for all
   using ( is_trip_member(trip_id) ) with check ( is_trip_member(trip_id) );
 create policy flights_all on flights for all
   using ( is_trip_member(trip_id) ) with check ( is_trip_member(trip_id) );
