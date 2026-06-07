@@ -147,6 +147,19 @@
     border:1px solid var(--line);border-radius:10px}
   .add-place-row input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 
+  /* AIRPORT AUTOCOMPLETE */
+  .airport-wrap{position:relative;flex:1}
+  .airport-dropdown{position:absolute;top:calc(100% + 2px);left:0;right:0;background:var(--paper);
+    border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);
+    z-index:200;max-height:200px;overflow-y:auto;display:none}
+  .airport-dropdown.open{display:block}
+  .airport-opt{padding:8px 12px;cursor:pointer;display:flex;align-items:baseline;gap:10px;font-size:14px}
+  .airport-opt:hover{background:var(--accent-soft)}
+  .airport-iata{font-family:'Fraunces',serif;font-weight:700;font-size:15px;min-width:38px;color:var(--ink)}
+  .airport-info{color:var(--ink-soft);font-size:13px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .airport-badge{font-size:11px;color:var(--gold);flex-shrink:0}
+  .airport-hint{font-size:12px;color:var(--ink-soft);font-style:italic;margin-top:3px;min-height:15px}
+
   /* RESEARCH */
   .research-section{margin-top:34px;padding-top:26px;border-top:1px solid var(--line)}
   .research-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px}
@@ -368,8 +381,18 @@
 <!-- Flight modal -->
 <div class="overlay" id="ov-flight"><div class="modal">
   <h3>Add flight</h3><div class="sub">Fill what you know.</div>
-  <div class="row"><div><label>From</label><input id="f-origin" placeholder="TLV"></div>
-    <div><label>To</label><input id="f-destination" placeholder="DAD"></div></div>
+  <div class="row">
+    <div class="airport-wrap"><label>From</label>
+      <input id="f-origin" placeholder="city or code" autocomplete="off" oninput="airportInput('f-origin','f-origin-drop','f-origin-hint')">
+      <div id="f-origin-drop" class="airport-dropdown"></div>
+      <div id="f-origin-hint" class="airport-hint"></div>
+    </div>
+    <div class="airport-wrap"><label>To</label>
+      <input id="f-destination" placeholder="city or code" autocomplete="off" oninput="airportInput('f-destination','f-destination-drop','f-destination-hint')">
+      <div id="f-destination-drop" class="airport-dropdown"></div>
+      <div id="f-destination-hint" class="airport-hint"></div>
+    </div>
+  </div>
   <div class="row"><div><label>Airline</label><input id="f-airline"></div>
     <div><label>Flight no.</label><input id="f-flight_no"></div></div>
   <div class="row"><div><label>Date</label><input id="f-depart_date"></div>

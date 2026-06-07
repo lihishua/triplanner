@@ -589,6 +589,12 @@ function editFlight(id) {
   document.getElementById('f-save-btn').textContent = 'Update flight';
   ['origin','destination','airline','flight_no','depart_date','depart_time','price','notes']
     .forEach(k => document.getElementById('f-'+k).value = f[k] || '');
+  ['origin','destination'].forEach(k => {
+    const iata = (f[k] || '').toUpperCase();
+    const airport = AIRPORTS.find(a => a[0] === iata);
+    document.getElementById('f-'+k+'-hint').textContent = airport
+      ? airport[2] + ' · ' + airport[1] + ', ' + airport[3] : '';
+  });
   openOverlay('ov-flight');
 }
 
@@ -730,6 +736,62 @@ async function saveBudgetTarget(){
   if(error) return alert(error.message);
   closeAll(); await refreshAll();
 }
+
+/* ---------------- AIRPORT AUTOCOMPLETE ---------------- */
+// [iata, city, airportName, country, isPrimary]
+const AIRPORTS=[['TLV','Tel Aviv','Ben Gurion International','Israel',1],['VDA','Eilat','Ramon International','Israel',1],['CMB','Colombo','Bandaranaike International','Sri Lanka',1],['GOI','Goa','Manohar International','India',1],['BOM','Mumbai','Chhatrapati Shivaji International','India',1],['DEL','Delhi','Indira Gandhi International','India',1],['BLR','Bangalore','Kempegowda International','India',1],['MAA','Chennai','Chennai International','India',1],['CCU','Kolkata','Netaji Subhas Chandra Bose International','India',1],['HYD','Hyderabad','Rajiv Gandhi International','India',1],['COK','Kochi','Cochin International','India',1],['HAN','Hanoi','Noi Bai International','Vietnam',1],['SGN','Ho Chi Minh City','Tan Son Nhat International','Vietnam',1],['DAD','Da Nang','Da Nang International','Vietnam',1],['BKK','Bangkok','Suvarnabhumi International','Thailand',1],['DMK','Bangkok','Don Mueang International','Thailand',0],['HKT','Phuket','Phuket International','Thailand',1],['CNX','Chiang Mai','Chiang Mai International','Thailand',1],['USM','Koh Samui','Samui Airport','Thailand',1],['DPS','Bali','Ngurah Rai International','Indonesia',1],['CGK','Jakarta','Soekarno-Hatta International','Indonesia',1],['KUL','Kuala Lumpur','KLIA','Malaysia',1],['LGK','Langkawi','Langkawi International','Malaysia',1],['SIN','Singapore','Changi International','Singapore',1],['MNL','Manila','Ninoy Aquino International','Philippines',1],['CEB','Cebu','Mactan-Cebu International','Philippines',1],['NRT','Tokyo','Narita International','Japan',1],['HND','Tokyo','Haneda International','Japan',0],['KIX','Osaka','Kansai International','Japan',1],['FUK','Fukuoka','Fukuoka Airport','Japan',1],['OKA','Okinawa','Naha Airport','Japan',1],['ICN','Seoul','Incheon International','South Korea',1],['GMP','Seoul','Gimpo International','South Korea',0],['PEK','Beijing','Capital International','China',1],['PVG','Shanghai','Pudong International','China',1],['SHA','Shanghai','Hongqiao International','China',0],['CAN','Guangzhou','Baiyun International','China',1],['TPE','Taipei','Taiwan Taoyuan International','Taiwan',1],['PNH','Phnom Penh','Phnom Penh International','Cambodia',1],['REP','Siem Reap','Siem Reap International','Cambodia',1],['KTM','Kathmandu','Tribhuvan International','Nepal',1],['MLE','Male','Velana International','Maldives',1],['DXB','Dubai','Dubai International','UAE',1],['AUH','Abu Dhabi','Zayed International','UAE',1],['SHJ','Sharjah','Sharjah International','UAE',1],['DOH','Doha','Hamad International','Qatar',1],['MCT','Muscat','Muscat International','Oman',1],['AMM','Amman','Queen Alia International','Jordan',1],['IST','Istanbul','Istanbul Airport','Turkey',1],['SAW','Istanbul','Sabiha Gokcen International','Turkey',0],['AYT','Antalya','Antalya Airport','Turkey',1],['CAI','Cairo','Cairo International','Egypt',1],['SSH','Sharm el-Sheikh','Sharm el-Sheikh International','Egypt',1],['HRG','Hurghada','Hurghada International','Egypt',1],['CMN','Casablanca','Mohammed V International','Morocco',1],['RAK','Marrakech','Menara Airport','Morocco',1],['ADD','Addis Ababa','Bole International','Ethiopia',1],['NBO','Nairobi','Jomo Kenyatta International','Kenya',1],['DAR','Dar es Salaam','Julius Nyerere International','Tanzania',1],['ZNZ','Zanzibar','Abeid Amani Karume International','Tanzania',1],['JNB','Johannesburg','OR Tambo International','South Africa',1],['CPT','Cape Town','Cape Town International','South Africa',1],['LHR','London','Heathrow Airport','UK',1],['LGW','London','Gatwick Airport','UK',0],['STN','London','Stansted Airport','UK',0],['MAN','Manchester','Manchester Airport','UK',1],['EDI','Edinburgh','Edinburgh Airport','UK',1],['CDG','Paris','Charles de Gaulle Airport','France',1],['ORY','Paris','Orly Airport','France',0],['NCE','Nice','Nice Côte d\'Azur Airport','France',1],['FRA','Frankfurt','Frankfurt Airport','Germany',1],['MUC','Munich','Munich Airport','Germany',1],['BER','Berlin','Berlin Brandenburg Airport','Germany',1],['MAD','Madrid','Adolfo Suárez Madrid-Barajas','Spain',1],['BCN','Barcelona','El Prat Airport','Spain',1],['AGP','Málaga','Costa del Sol Airport','Spain',1],['PMI','Palma de Mallorca','Son Sant Joan Airport','Spain',1],['IBZ','Ibiza','Ibiza Airport','Spain',1],['FCO','Rome','Fiumicino Airport','Italy',1],['MXP','Milan','Malpensa Airport','Italy',1],['VCE','Venice','Marco Polo Airport','Italy',1],['FLR','Florence','Peretola Airport','Italy',1],['NAP','Naples','Naples International','Italy',1],['ATH','Athens','Eleftherios Venizelos','Greece',1],['HER','Heraklion','Nikos Kazantzakis Airport','Greece',1],['RHO','Rhodes','Diagoras Airport','Greece',1],['CFU','Corfu','Ioannis Kapodistrias Airport','Greece',1],['JMK','Mykonos','Mykonos Airport','Greece',1],['LIS','Lisbon','Humberto Delgado Airport','Portugal',1],['OPO','Porto','Francisco de Sá Carneiro','Portugal',1],['FAO','Faro','Faro Airport','Portugal',1],['AMS','Amsterdam','Amsterdam Schiphol','Netherlands',1],['ZRH','Zurich','Zurich Airport','Switzerland',1],['GVA','Geneva','Geneva Airport','Switzerland',1],['VIE','Vienna','Vienna International','Austria',1],['SPU','Split','Split Airport','Croatia',1],['DBV','Dubrovnik','Dubrovnik Airport','Croatia',1],['PRG','Prague','Václav Havel Airport','Czech Republic',1],['BUD','Budapest','Ferenc Liszt Airport','Hungary',1],['WAW','Warsaw','Chopin Airport','Poland',1],['KEF','Reykjavik','Keflavik International','Iceland',1],['OSL','Oslo','Gardermoen Airport','Norway',1],['ARN','Stockholm','Arlanda Airport','Sweden',1],['CPH','Copenhagen','Copenhagen Airport','Denmark',1],['HEL','Helsinki','Helsinki Airport','Finland',1],['DUB','Dublin','Dublin Airport','Ireland',1],['BRU','Brussels','Brussels Airport','Belgium',1],['JFK','New York','John F. Kennedy International','USA',1],['EWR','New York','Newark Liberty International','USA',0],['LGA','New York','LaGuardia Airport','USA',0],['LAX','Los Angeles','Los Angeles International','USA',1],['ORD','Chicago','O\'Hare International','USA',1],['ATL','Atlanta','Hartsfield-Jackson International','USA',1],['DFW','Dallas','Dallas/Fort Worth International','USA',1],['SFO','San Francisco','San Francisco International','USA',1],['MIA','Miami','Miami International','USA',1],['LAS','Las Vegas','Harry Reid International','USA',1],['MCO','Orlando','Orlando International','USA',1],['YYZ','Toronto','Pearson International','Canada',1],['YVR','Vancouver','Vancouver International','Canada',1],['CUN','Cancún','Cancún International','Mexico',1],['MEX','Mexico City','Benito Juárez International','Mexico',1],['GRU','São Paulo','Guarulhos International','Brazil',1],['GIG','Rio de Janeiro','Galeão International','Brazil',1],['EZE','Buenos Aires','Ministro Pistarini International','Argentina',1],['BOG','Bogotá','El Dorado International','Colombia',1],['LIM','Lima','Jorge Chávez International','Peru',1],['SCL','Santiago','Arturo Merino Benítez International','Chile',1],['SYD','Sydney','Kingsford Smith Airport','Australia',1],['MEL','Melbourne','Tullamarine Airport','Australia',1],['BNE','Brisbane','Brisbane Airport','Australia',1],['AKL','Auckland','Auckland Airport','New Zealand',1],['SVO','Moscow','Sheremetyevo International','Russia',1],['TBS','Tbilisi','Tbilisi International','Georgia',1],['EVN','Yerevan','Zvartnots International','Armenia',1],['TAS','Tashkent','Tashkent International','Uzbekistan',1],['SEZ','Mahé','Seychelles International','Seychelles',1],['MRU','Mauritius','Sir Seewoosagur Ramgoolam International','Mauritius',1],['RGN','Yangon','Yangon International','Myanmar',1],['RUH','Riyadh','King Khalid International','Saudi Arabia',1],['JED','Jeddah','King Abdulaziz International','Saudi Arabia',1],['HAV','Havana','José Martí International','Cuba',1]];
+
+function searchAirports(q, limit = 7) {
+  const s = q.toLowerCase().trim();
+  if (s.length < 2) return [];
+  const scored = AIRPORTS.map(a => {
+    const [iata, city, name, country, main] = a;
+    const il = iata.toLowerCase(), cl = city.toLowerCase(), nl = name.toLowerCase();
+    let score = 0;
+    if (il === s) score = 100;
+    else if (il.startsWith(s)) score = 80;
+    else if (cl === s) score = 70;
+    else if (cl.startsWith(s)) score = 55;
+    else if (cl.includes(s)) score = 40;
+    else if (nl.includes(s)) score = 20;
+    else if (country.toLowerCase().includes(s)) score = 10;
+    return score > 0 ? { a, score } : null;
+  }).filter(Boolean);
+  scored.sort((x, y) => y.score - x.score || y.a[4] - x.a[4]);
+  return scored.slice(0, limit).map(x => x.a);
+}
+
+let _airDebounce = {};
+function airportInput(inputId, dropId, hintId) {
+  clearTimeout(_airDebounce[inputId]);
+  _airDebounce[inputId] = setTimeout(() => {
+    const q = document.getElementById(inputId)?.value || '';
+    const results = searchAirports(q);
+    const drop = document.getElementById(dropId);
+    if (!results.length) { drop.classList.remove('open'); return; }
+    drop.innerHTML = results.map(([iata, city, name, country, main]) =>
+      `<div class="airport-opt${main ? ' primary' : ''}"
+        onclick="pickAirport('${inputId}','${dropId}','${hintId}','${iata}','${esc(city)}','${esc(name)}','${esc(country)}')">
+        <span class="airport-iata">${iata}</span>
+        <span class="airport-info">${esc(name)} · ${esc(city)}, ${esc(country)}</span>
+        ${main ? '<span class="airport-badge">main</span>' : ''}
+      </div>`
+    ).join('');
+    drop.classList.add('open');
+  }, 280);
+}
+
+function pickAirport(inputId, dropId, hintId, iata, city, name, country) {
+  document.getElementById(inputId).value = iata;
+  document.getElementById(dropId).classList.remove('open');
+  document.getElementById(hintId).textContent = name + ' · ' + city + ', ' + country;
+}
+
+document.addEventListener('click', e => {
+  document.querySelectorAll('.airport-dropdown.open').forEach(d => {
+    if (!d.parentElement.contains(e.target)) d.classList.remove('open');
+  });
+});
 
 /* ---------------- helpers ---------------- */
 const FLAGS={vietnam:'🇻🇳',thailand:'🇹🇭',philippines:'🇵🇭',japan:'🇯🇵',italy:'🇮🇹',france:'🇫🇷',spain:'🇪🇸',greece:'🇬🇷',portugal:'🇵🇹',indonesia:'🇮🇩',india:'🇮🇳',turkey:'🇹🇷',mexico:'🇲🇽',israel:'🇮🇱',germany:'🇩🇪',morocco:'🇲🇦',cambodia:'🇰🇭',malaysia:'🇲🇾',singapore:'🇸🇬',croatia:'🇭🇷',australia:'🇦🇺','sri lanka':'🇱🇰',nepal:'🇳🇵',bali:'🇮🇩',egypt:'🇪🇬',jordan:'🇯🇴',kenya:'🇰🇪',tanzania:'🇹🇿',peru:'🇵🇪',colombia:'🇨🇴',argentina:'🇦🇷',brazil:'🇧🇷',chile:'🇨🇱',china:'🇨🇳','south korea':'🇰🇷',taiwan:'🇹🇼',myanmar:'🇲🇲',laos:'🇱🇦',maldives:'🇲🇻',seychelles:'🇸🇨',iceland:'🇮🇸',norway:'🇳🇴',sweden:'🇸🇪',netherlands:'🇳🇱',switzerland:'🇨🇭',austria:'🇦🇹',czechia:'🇨🇿',hungary:'🇭🇺',poland:'🇵🇱',ukraine:'🇺🇦',georgia:'🇬🇪',armenia:'🇦🇲',uzbekistan:'🇺🇿',vietnam:'🇻🇳',usa:'🇺🇸','united states':'🇺🇸',canada:'🇨🇦',uk:'🇬🇧','united kingdom':'🇬🇧',ireland:'🇮🇪',newzealand:'🇳🇿','new zealand':'🇳🇿',southafrica:'🇿🇦','south africa':'🇿🇦',ethiopia:'🇪🇹',cuba:'🇨🇺',iran:'🇮🇷',oman:'🇴🇲',uae:'🇦🇪','united arab emirates':'🇦🇪'};
