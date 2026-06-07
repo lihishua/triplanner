@@ -345,60 +345,24 @@ function renderCountries() {
   } else {
     el.innerHTML = countries.map(c => {
       const n = cities.filter(ci => ci.country_id === c.id).length;
+      const daysLabel = c.planned_days ? ` · ${c.planned_days} days` : '';
       return `<div class="card country-card" onclick="openCountry('${c.id}')">
         <div class="country-flag">${esc(c.flag) || '🌍'}</div>
         <h3>${esc(c.name)}</h3>
-        <div class="when">${n} ${n === 1 ? 'city' : 'cities'}</div>
-        ${c.best_time ? `<div class="notes">Best: ${esc(c.best_time)}</div>` : ''}
+        <div class="when">${n} ${n === 1 ? 'place' : 'places'}${daysLabel}</div>
       </div>`;
     }).join('');
   }
-  renderPlacesToBe();
-}
-
-/* ---------------- PLACES TO BE ---------------- */
-function renderPlacesToBe() {
-  const el = document.getElementById('ptb-list');
-  if (!el) return;
-  if (!cities.length) {
-    el.innerHTML = '<div class="empty" style="margin-bottom:16px">No places added yet.</div>';
-    return;
-  }
-  const total = cities.reduce((s, c) => s + (c.planned_days || 0), 0);
-  el.innerHTML = cities.map(c => {
-    const country = countries.find(co => co.id === c.country_id);
-    return `<div class="ptb-row">
-      <span class="ptb-place">📍 ${esc(c.name)}</span>
-      <span class="ptb-country">${esc(country?.flag || '')} ${esc(country?.name || '')}</span>
-      <div class="ptb-days">
-        <input type="number" class="ptb-days" min="1" max="365"
-          value="${c.planned_days || ''}" placeholder="?"
-          onchange="savePlannedStay('${c.id}', this.value)">
-        <span class="ptb-unit">days</span>
-      </div>
-    </div>`;
-  }).join('') + (total > 0
-    ? `<div class="ptb-total">Total: <b>${total} days</b> planned</div>`
-    : '');
-}
-
-async function savePlannedStay(cityId, val) {
-  const days = parseInt(val) || null;
-  const city = cities.find(c => c.id === cityId);
-  if (!city) return;
-  city.planned_days = days;
-  renderPlacesToBe();
-  if (GUEST_MODE) { lsUpdate('cities', cityId, { planned_days: days }); return; }
-  await sb.from('cities').update({ planned_days: days }).eq('id', cityId);
 }
 
 async function suggestItinerary() {
-  const out = document.getElementById('ptb-ai-out');
-  out.textContent = 'Thinking…';
-  const placesData = cities.map(c => {
-    const country = countries.find(co => co.id === c.country_id);
-    return { name: c.name, country: country?.name || '', planned_days: c.planned_days || null };
-  });
+  openOverlay('ov-plan');
+  document.getElementById('plan-ai-out').textContent = 'Asking Claude…';
+  const placesData = countries.map(c => ({
+    name: c.name, planned_days: c.planned_days || null,
+    places: cities.filter(ci => ci.country_id === c.id)
+      .map(ci => ({ name: ci.name, planned_days: ci.planned_days || null })),
+  }));
   const flightsData = flights.map(f => ({
     from: f.origin, to: f.destination, date: f.depart_date,
     airline: f.airline, price: f.price,
@@ -407,28 +371,110 @@ async function suggestItinerary() {
     const { data, error } = await sb.functions.invoke('plan-trip', {
       body: { places: placesData, flights: flightsData },
     });
-    if (error || !data?.suggestion) {
-      out.textContent = error?.message || 'Could not get a suggestion. Deploy the plan-trip function first.';
-      return;
-    }
-    out.textContent = data.suggestion;
+    document.getElementById('plan-ai-out').textContent =
+      error ? (error.message || JSON.stringify(error))
+      : (data?.suggestion || 'No suggestion returned.');
   } catch (e) {
-    out.textContent = 'Error: ' + String(e);
+    document.getElementById('plan-ai-out').textContent = 'Error: ' + String(e);
   }
 }
 
 /* ---------------- COUNTRY + CITY DETAIL ---------------- */
 function openCountry(id) {
   const c = countries.find(x => x.id === id); if (!c) return;
-  const cs = cities.filter(ci => ci.country_id === id);
+  const places = cities.filter(ci => ci.country_id === id);
+  const placeTotal = places.reduce((s, p) => s + (p.planned_days || 0), 0);
+  const over = c.planned_days && placeTotal > c.planned_days;
+
   document.getElementById('detailTitle').textContent = (c.flag || '') + ' ' + c.name;
-  document.getElementById('detailBody').innerHTML =
-    (cs.length ? cs.map(ci =>
-      `<div class="row-item" onclick="openCity('${ci.id}')">
-         <span>📍 ${esc(ci.name)}</span><span class="chev">›</span>
-       </div>`).join('')
-      : '<div class="empty">No cities yet in this country.</div>');
+  document.getElementById('detailBody').innerHTML = `
+    <div class="country-days-row">
+      <span style="flex:1">Planning to spend</span>
+      <input type="number" min="1" max="365" value="${c.planned_days || ''}" placeholder="?"
+        class="country-days-row input"
+        style="width:60px;text-align:center;font-size:15px;padding:5px 8px;border:1px solid var(--line);border-radius:8px"
+        onchange="saveCountryDays('${c.id}', this.value)">
+      <span>days here</span>
+    </div>
+
+    <div class="places-header">Places to visit</div>
+
+    ${places.map(p => `
+      <div class="place-item">
+        <span class="place-item-name" onclick="openCity('${p.id}')">📍 ${esc(p.name)}</span>
+        <input type="number" min="0.5" max="365" step="0.5"
+          value="${p.planned_days || ''}" placeholder="days"
+          class="place-days-input"
+          onchange="savePlaceTime('${p.id}','${c.id}',this.value)">
+        <span class="place-days-unit">days</span>
+        <button class="del" style="position:static;opacity:.35;font-size:17px;margin-left:2px"
+          onclick="deletePlace('${p.id}','${c.id}')">×</button>
+      </div>`).join('')}
+    ${!places.length ? '<div class="empty" style="margin:8px 0 12px">No places yet — add some below.</div>' : ''}
+
+    ${placeTotal > 0 ? `<div class="places-total">Places total: <b>${placeTotal} days</b>${c.planned_days ? ' of ' + c.planned_days + ' planned' : ''}</div>` : ''}
+
+    ${over ? `<div class="time-warning" id="time-warning">
+      Your places add up to <b>${placeTotal} days</b>, but you've planned only <b>${c.planned_days} days</b> for ${esc(c.name)}.
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn small" onclick="saveCountryDays('${c.id}',${placeTotal})">Update to ${placeTotal} days</button>
+        <button class="btn ghost small" onclick="document.getElementById('time-warning').remove()">I'll adjust</button>
+      </div>
+    </div>` : ''}
+
+    <div class="add-place-row">
+      <input id="new-place-${c.id}" placeholder="City, park, restaurant, beach…" style="flex:1"
+        onkeydown="if(event.key==='Enter')addPlaceToCountry('${c.id}')">
+      <button class="btn small" onclick="addPlaceToCountry('${c.id}')">Add</button>
+    </div>`;
+
   openOverlay('ov-detail');
+}
+
+async function saveCountryDays(countryId, val) {
+  const days = parseFloat(val) || null;
+  const country = countries.find(c => c.id === countryId);
+  if (!country) return;
+  country.planned_days = days;
+  if (GUEST_MODE) { lsUpdate('countries', countryId, { planned_days: days }); }
+  else await sb.from('countries').update({ planned_days: days }).eq('id', countryId);
+  openCountry(countryId);
+}
+
+async function savePlaceTime(placeId, countryId, val) {
+  const days = parseFloat(val) || null;
+  const place = cities.find(c => c.id === placeId);
+  if (!place) return;
+  place.planned_days = days;
+  if (GUEST_MODE) { lsUpdate('cities', placeId, { planned_days: days }); }
+  else await sb.from('cities').update({ planned_days: days }).eq('id', placeId);
+  openCountry(countryId);
+}
+
+async function addPlaceToCountry(countryId) {
+  const input = document.getElementById('new-place-' + countryId);
+  const name = input?.value.trim();
+  if (!name) return;
+  const country = countries.find(c => c.id === countryId);
+  const geo = await geocode(name + (country ? ', ' + country.name : ''));
+  if (GUEST_MODE) {
+    const newPlace = lsInsert('cities', { trip_id: TRIP_ID, country_id: countryId, name: cap(name), lat: geo.lat, lng: geo.lng });
+    cities.push(newPlace);
+  } else {
+    const { data, error } = await sb.from('cities')
+      .insert({ trip_id: TRIP_ID, country_id: countryId, name: cap(name), lat: geo.lat, lng: geo.lng })
+      .select().single();
+    if (error) { alert(error.message); return; }
+    cities.push(data);
+  }
+  openCountry(countryId);
+}
+
+async function deletePlace(placeId, countryId) {
+  cities = cities.filter(c => c.id !== placeId);
+  if (GUEST_MODE) { lsDelete('cities', placeId); }
+  else await sb.from('cities').delete().eq('id', placeId);
+  openCountry(countryId);
 }
 
 async function openCity(id) {

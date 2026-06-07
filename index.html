@@ -126,23 +126,26 @@
   .ai-out{white-space:pre-wrap;color:var(--ink);font-size:15.5px;line-height:1.55}
   footer{text-align:center;color:var(--ink-soft);font-size:13px;font-style:italic;padding:30px 0}
 
-  /* PLACES TO BE */
-  .ptb-section{margin-top:34px;padding-top:26px;border-top:1px solid var(--line)}
-  .ptb-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px}
-  .ptb-head h3{font-family:'Fraunces',serif;font-weight:600;font-size:20px}
-  .ptb-row{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
-  .ptb-place{font-size:16px;flex:1;min-width:120px}
-  .ptb-country{color:var(--ink-soft);font-size:14px;min-width:80px}
-  .ptb-days{display:flex;align-items:center;gap:6px}
-  .ptb-days input{width:58px;font-family:'Newsreader',serif;font-size:15px;padding:5px 8px;
-    border:1px solid var(--line);border-radius:8px;text-align:center}
-  .ptb-days input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-  .ptb-unit{color:var(--ink-soft);font-size:14px}
-  .ptb-total{padding:12px 0 4px;font-size:15px;color:var(--ink-soft)}
-  .ptb-ai-block{border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:16px}
-  .ptb-ai-head{display:flex;justify-content:space-between;align-items:center;
-    font-family:'Fraunces',serif;font-weight:600;margin-bottom:10px}
-  .ptb-ai-out{white-space:pre-wrap;color:var(--ink);font-size:15px;line-height:1.6}
+  /* COUNTRY DETAIL */
+  .country-days-row{display:flex;align-items:center;gap:8px;background:var(--accent-soft);
+    border-radius:12px;padding:12px 14px;margin-bottom:16px}
+  .country-days-row span{font-family:'Fraunces',serif;font-size:14px;color:var(--ink-soft)}
+  .country-days-row input{width:60px;text-align:center;font-size:15px;padding:5px 8px;
+    border:1px solid var(--line);border-radius:8px}
+  .places-header{font-family:'Fraunces',serif;font-weight:600;font-size:15px;margin:4px 0 10px}
+  .place-item{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line)}
+  .place-item-name{flex:1;font-size:15px;cursor:pointer}
+  .place-item-name:hover{color:var(--accent)}
+  .place-days-input{width:52px;text-align:center;font-size:14px;padding:4px 6px;
+    border:1px solid var(--line);border-radius:8px}
+  .place-days-unit{color:var(--ink-soft);font-size:13px}
+  .places-total{font-size:14px;color:var(--ink-soft);padding:10px 0 4px}
+  .time-warning{background:#fff8f0;border:1px solid #e8c97a;border-radius:12px;
+    padding:12px 14px;margin:10px 0;font-size:14px;line-height:1.55}
+  .add-place-row{display:flex;gap:8px;margin-top:14px;align-items:center}
+  .add-place-row input{font-family:'Newsreader',serif;font-size:15px;padding:8px 12px;
+    border:1px solid var(--line);border-radius:10px}
+  .add-place-row input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 
   /* RESEARCH */
   .research-section{margin-top:34px;padding-top:26px;border-top:1px solid var(--line)}
@@ -273,6 +276,7 @@
     <header class="top">
       <div class="brand"><span class="dot"></span><h1>TriPlanner</h1><small>our trip, together</small></div>
       <div class="top-actions">
+        <button class="btn ghost" onclick="suggestItinerary()">✦ Plan</button>
         <button class="btn ghost" onclick="previewTrip()">▶ Preview trip</button>
         <button class="btn ghost" onclick="openCapture()">＋ Capture</button>
         <button id="logout-btn" class="btn ghost" onclick="doLogout()">Log out</button>
@@ -291,20 +295,6 @@
         <button class="btn" onclick="openCapture()">＋ Add place</button>
       </div>
       <div class="grid countries" id="countryList"></div>
-
-      <div class="ptb-section">
-        <div class="ptb-head">
-          <h3>Places to be</h3>
-        </div>
-        <div id="ptb-list"></div>
-        <div class="ptb-ai-block">
-          <div class="ptb-ai-head">
-            <span>AI suggestion</span>
-            <button class="btn small" onclick="suggestItinerary()">✦ Suggest</button>
-          </div>
-          <div id="ptb-ai-out" class="ptb-ai-out">Fill in your places and how long you plan to stay, then tap Suggest for a timeline recommendation.</div>
-        </div>
-      </div>
     </section>
 
     <section class="page" id="page-flights">
@@ -340,6 +330,13 @@
   </div>
   <button class="fab" onclick="openCapture()">＋</button>
 </div>
+
+<!-- AI Plan modal -->
+<div class="overlay" id="ov-plan"><div class="modal">
+  <h3>Trip plan</h3>
+  <div id="plan-ai-out" class="ai-out" style="min-height:60px">Asking Claude…</div>
+  <div class="modal-actions"><button class="btn ghost" onclick="closeAll()">Close</button></div>
+</div></div>
 
 <!-- Capture modal -->
 <div class="overlay" id="ov-capture"><div class="modal">
