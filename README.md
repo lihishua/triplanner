@@ -2,21 +2,36 @@
 
 Plan your trip together — or solo.
 
-Collect places you want to visit, track your flights, manage your budget, and see everything on a map. No clutter, no complicated setup. Just open the app and start planning.
+Collect countries and places, track flights, manage your budget, and watch your route animate on a globe. No clutter, no complicated setup.
 
 ## What you can do
 
-**Places & map** — Save cities and countries as you discover them. Paste an Instagram link alongside a place so you never lose what inspired you. Everything plots automatically on a map.
+**Countries & places** — Add countries you want to visit. Click a country to set how many days you plan to spend there, add specific places inside it (cities, parks, restaurants, beaches — anything), and set individual time estimates per place. If your places exceed your country total, the app warns you and offers to fix it.
 
-**Flights** — Log every leg of your trip in one place. Airline, flight number, dates, price — all in one calm view.
+**✦ Plan** — Claude reads your entire trip (countries, places, planned days, flights) and gives you a timeline recommendation — suggested order, date ranges, gaps to fix, and places worth adding.
 
-**Budget** — Add expenses as you go, tag them by category and country, set a total target, and watch the spend meter. See exactly where the money is going.
+**▶ Preview trip** — A fullscreen animated globe. Your confirmed flights play one by one: an arc draws from city to city, a dot travels the route, and a card shows the airline, date, and price per person.
 
-**AI briefing** — Tap "Investigate" on any city and get a quick briefing on what to do there.
+**Flights** — Log every confirmed leg. Click a flight to edit it. From/To fields auto-suggest airport codes as you type a city name.
 
-**Shared trips** — Plan with someone else in real time. Create a trip, share the name, and your travel partner joins instantly. Everything stays in sync.
+**Research** — A scratchpad for flight options you're considering. Paste a screenshot and Claude extracts the flights automatically (airline, times, stops, price). Add the ones you like directly to your trip with one click.
 
-**Guest mode** — No account needed. Jump straight in and plan — data stays on your device.
+**Budget** — Add expenses by category and country, set a total target, see a spend meter and per-category breakdown.
 
-## Multiple trips
-Each trip has its own name. Start a new one for next year, with different people, without touching the old one.
+**AI briefing** — Tap "Investigate" on any place for a practical briefing on what to do there.
+
+**Shared trips** — Create a trip, share the name, your travel partner joins instantly by entering your email + trip name. Everything syncs in real time.
+
+**Guest mode** — No account needed. Jump in and plan — data stays on your device.
+
+**Multiple trips** — Each trip has its own name. Start a new one next year, with different people, without touching the old one.
+
+## Tech
+Vanilla JS · Supabase (auth + Postgres + storage) · Mapbox GL JS (globe preview) · Anthropic Claude (AI features) · Open-Meteo (weather) · OpenStreetMap (geocoding)
+
+## Setup
+1. Fill in `config.js` with your Supabase project URL and anon key
+2. Run `schema.sql` → `budget.sql` → `research.sql` in the Supabase SQL editor
+3. Run the three `ALTER TABLE` migrations (planned_days on countries + places, extracted_flights on flight_research)
+4. Deploy the edge functions: `supabase functions deploy investigate && supabase functions deploy extract-flight && supabase functions deploy plan-trip`
+5. Set `ANTHROPIC_API_KEY` as a Supabase secret

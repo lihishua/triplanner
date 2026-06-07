@@ -1,0 +1,34 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate config.js from secrets
+        run: |
+          cat > config.js << 'ENDOFFILE'
+          window.TRIPLANNER_CONFIG = {
+            SUPABASE_URL: "SUPABASE_URL_PLACEHOLDER",
+            SUPABASE_ANON_KEY: "SUPABASE_ANON_KEY_PLACEHOLDER",
+            MAPBOX_TOKEN: "MAPBOX_TOKEN_PLACEHOLDER",
+          };
+          ENDOFFILE
+          sed -i "s|SUPABASE_URL_PLACEHOLDER|${{ secrets.SUPABASE_URL }}|g" config.js
+          sed -i "s|SUPABASE_ANON_KEY_PLACEHOLDER|${{ secrets.SUPABASE_ANON_KEY }}|g" config.js
+          sed -i "s|MAPBOX_TOKEN_PLACEHOLDER|${{ secrets.MAPBOX_TOKEN }}|g" config.js
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .
+          exclude_assets: '.github,supabase,.gitignore'
