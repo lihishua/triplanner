@@ -951,8 +951,12 @@ function chainFlightsAsRoute(fs) {
 
   const norm = s => (s || '').toLowerCase().trim();
 
-  // Try date sort first as a baseline
-  const byDate = [...fs].sort((a, b) => (a.depart_date || '').localeCompare(b.depart_date || ''));
+  // Sort by date, empty dates go last so undated legs don't steal the start
+  const byDate = [...fs].sort((a, b) => {
+    const da = a.depart_date || '￿';
+    const db = b.depart_date || '￿';
+    return da.localeCompare(db);
+  });
 
   // Find the leg whose origin is not the destination of any other leg
   const allDests = new Set(fs.map(f => norm(f.destination)));
