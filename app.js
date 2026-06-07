@@ -485,15 +485,6 @@ async function openCity(id) {
   body.innerHTML = `
     <div id="wx" class="wx">Loading weather…</div>
     ${c.source_url ? `<a class="srclink" href="${esc(c.source_url)}" target="_blank">↗ open saved link</a>` : ''}
-    <div style="display:flex;align-items:center;gap:10px;margin:12px 0;padding:12px 14px;
-      background:var(--accent-soft);border-radius:12px">
-      <span style="font-family:'Fraunces',serif;font-size:14px;color:var(--ink-soft);flex:1">Planning to stay</span>
-      <input type="number" id="city-stay-input" min="1" max="365"
-        value="${c.planned_days || ''}" placeholder="—"
-        style="width:60px;text-align:center;font-size:15px;padding:5px 8px;border:1px solid var(--line);border-radius:8px"
-        onchange="savePlannedStay('${c.id}', this.value)">
-      <span style="color:var(--ink-soft);font-size:14px">days</span>
-    </div>
     <div class="ai-block">
       <div class="ai-head">
         <span>What to do here</span>
