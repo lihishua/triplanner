@@ -554,33 +554,66 @@ async function investigate(cityId) {
 }
 
 /* ---------------- FLIGHTS ---------------- */
+let _editingFlightId = null;
+
 function renderFlights() {
   const el = document.getElementById('flightList');
   if (!flights.length) { el.innerHTML = '<div class="empty">No flights yet.</div>'; return; }
   el.innerHTML = flights.map(f => `
-    <div class="card">
-      <button class="del" onclick="delFlight('${f.id}')">×</button>
+    <div class="card" onclick="editFlight('${f.id}')" style="cursor:pointer">
+      <button class="del" onclick="event.stopPropagation();delFlight('${f.id}')">×</button>
       <div class="flight-route"><span>${esc(f.origin)||'—'}</span>
         <span class="arrow"></span><span>${esc(f.destination)||'—'}</span></div>
       <div class="flight-meta">
-        ${f.airline?`<span><b>${esc(f.airline)}</b> ${esc(f.flight_no)}</span>`:''}
-        ${f.depart_date?`<span>${esc(f.depart_date)} ${esc(f.depart_time)}</span>`:''}
+        ${f.airline?`<span><b>${esc(f.airline)}</b> ${esc(f.flight_no)||''}</span>`:''}
+        ${f.depart_date?`<span>${esc(f.depart_date)} ${esc(f.depart_time)||''}</span>`:''}
         ${f.price?`<span class="pill">${esc(f.price)}</span>`:''}
       </div>
       ${f.notes?`<div class="flight-meta" style="margin-top:8px">${esc(f.notes)}</div>`:''}
     </div>`).join('');
 }
-function openFlight(){ ['origin','destination','airline','flight_no','depart_date','depart_time','price','notes']
-  .forEach(k=>document.getElementById('f-'+k).value=''); openOverlay('ov-flight'); }
-async function saveFlight(){
-  const f={ trip_id: TRIP_ID };
+
+function openFlight() {
+  _editingFlightId = null;
+  document.querySelector('#ov-flight .modal h3').textContent = 'Add flight';
+  document.getElementById('f-save-btn').textContent = 'Save flight';
   ['origin','destination','airline','flight_no','depart_date','depart_time','price','notes']
-    .forEach(k=>f[k]=val('f-'+k).trim());
-  if (GUEST_MODE) { lsInsert('flights', f); closeAll(); await refreshAll(); return; }
-  const { error } = await sb.from('flights').insert(f);
-  if (error) return alert(error.message);
+    .forEach(k => document.getElementById('f-'+k).value = '');
+  openOverlay('ov-flight');
+}
+
+function editFlight(id) {
+  const f = flights.find(x => x.id === id); if (!f) return;
+  _editingFlightId = id;
+  document.querySelector('#ov-flight .modal h3').textContent = 'Edit flight';
+  document.getElementById('f-save-btn').textContent = 'Update flight';
+  ['origin','destination','airline','flight_no','depart_date','depart_time','price','notes']
+    .forEach(k => document.getElementById('f-'+k).value = f[k] || '');
+  openOverlay('ov-flight');
+}
+
+async function saveFlight() {
+  const f = { trip_id: TRIP_ID };
+  ['origin','destination','airline','flight_no','depart_date','depart_time','price','notes']
+    .forEach(k => f[k] = val('f-'+k).trim());
+
+  if (_editingFlightId) {
+    if (GUEST_MODE) { lsUpdate('flights', _editingFlightId, f); }
+    else {
+      const { error } = await sb.from('flights').update(f).eq('id', _editingFlightId);
+      if (error) return alert(error.message);
+    }
+  } else {
+    if (GUEST_MODE) { lsInsert('flights', f); }
+    else {
+      const { error } = await sb.from('flights').insert(f);
+      if (error) return alert(error.message);
+    }
+  }
+  _editingFlightId = null;
   closeAll(); await refreshAll();
 }
+
 async function delFlight(id){
   if (GUEST_MODE) { lsDelete('flights', id); await refreshAll(); return; }
   await sb.from('flights').delete().eq('id', id); await refreshAll();
