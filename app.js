@@ -382,8 +382,8 @@ async function suggestItinerary() {
 /* ---------------- COUNTRY + CITY DETAIL ---------------- */
 function openCountry(id) {
   const c = countries.find(x => x.id === id); if (!c) return;
-  const places = places.filter(ci => ci.country_id === id);
-  const placeTotal = places.reduce((s, p) => s + (p.planned_days || 0), 0);
+  const pts = places.filter(ci => ci.country_id === id);
+  const placeTotal = pts.reduce((s, p) => s + (p.planned_days || 0), 0);
   const over = c.planned_days && placeTotal > c.planned_days;
 
   document.getElementById('detailTitle').textContent = (c.flag || '') + ' ' + c.name;
@@ -398,7 +398,7 @@ function openCountry(id) {
 
     <div class="places-header">Places to visit</div>
 
-    ${places.map(p => `
+    ${pts.map(p => `
       <div class="place-item">
         <span class="place-item-name" onclick="openCity('${p.id}')">📍 ${esc(p.name)}</span>
         <input type="number" min="0.5" max="365" step="0.5"
@@ -409,7 +409,7 @@ function openCountry(id) {
         <button class="del" style="position:static;opacity:.35;font-size:17px;margin-left:2px"
           onclick="deletePlace('${p.id}','${c.id}')">×</button>
       </div>`).join('')}
-    ${!places.length ? '<div class="empty" style="margin:8px 0 12px">No places yet — add some below.</div>' : ''}
+    ${!pts.length ? '<div class="empty" style="margin:8px 0 12px">No places yet — add some below.</div>' : ''}
 
     ${placeTotal > 0 ? `<div class="places-total">Places total: <b>${placeTotal} days</b>${c.planned_days ? ' of ' + c.planned_days + ' planned' : ''}</div>` : ''}
 
