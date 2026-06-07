@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TriPlanner — our trip, together</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet">
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet">
+<style>
+  :root{--bg:#f7f5f0;--paper:#fffdf9;--ink:#2c2a26;--ink-soft:#6b675e;--line:#e6e1d6;
+    --accent:#3f6f5e;--accent-soft:#e8efe9;--gold:#c2924a;
+    --shadow:0 1px 2px rgba(44,42,38,.04),0 8px 24px rgba(44,42,38,.06);--radius:16px;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:radial-gradient(900px 500px at 85% -10%,#eef2ec 0%,transparent 60%),
+    radial-gradient(700px 400px at -10% 110%,#f2ede2 0%,transparent 55%),var(--bg);
+    color:var(--ink);font-family:'Newsreader',Georgia,serif;font-size:17px;line-height:1.5;
+    -webkit-font-smoothing:antialiased;min-height:100vh;}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 24px 96px}
+
+  /* AUTH */
+  #auth{display:none;min-height:100vh;align-items:center;justify-content:center;padding:20px}
+  .authcard{background:var(--paper);border:1px solid var(--line);border-radius:22px;
+    box-shadow:var(--shadow);padding:34px;max-width:380px;width:100%;text-align:center}
+  .authcard .dot{width:9px;height:9px;border-radius:50%;background:var(--gold);display:inline-block}
+  .authcard h1{font-family:'Fraunces',serif;font-weight:600;font-size:30px;letter-spacing:-.5px;margin:10px 0 2px}
+  .authcard small{color:var(--ink-soft);font-style:italic}
+  .authcard input{width:100%;font-family:'Newsreader',serif;font-size:16px;padding:11px 13px;
+    border:1px solid var(--line);border-radius:11px;margin-top:12px;background:#fff}
+  .authcard input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .au-btns{display:flex;gap:10px;margin-top:16px}
+  #au-msg{color:var(--ink-soft);font-size:13px;margin-top:14px;min-height:18px}
+
+  header.top{display:flex;align-items:baseline;justify-content:space-between;padding:34px 0 10px;gap:16px;flex-wrap:wrap}
+  .brand{display:flex;align-items:baseline;gap:12px}
+  .brand h1{font-family:'Fraunces',serif;font-weight:600;font-size:30px;letter-spacing:-.5px;line-height:1}
+  .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--gold);display:inline-block;transform:translateY(-2px)}
+  .brand small{color:var(--ink-soft);font-style:italic;font-size:15px}
+  .top-actions{display:flex;gap:10px}
+
+  nav.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-top:18px}
+  nav.tabs button{font-family:'Fraunces',serif;font-size:16px;color:var(--ink-soft);background:none;
+    border:none;padding:12px 16px;cursor:pointer;position:relative;border-radius:10px 10px 0 0}
+  nav.tabs button.active{color:var(--ink)}
+  nav.tabs button.active::after{content:"";position:absolute;left:14px;right:14px;bottom:-1px;height:2px;background:var(--accent);border-radius:2px}
+
+  .page{display:none;padding-top:26px}
+  .page.active{display:block}
+  .page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+  .page-head h2{font-family:'Fraunces',serif;font-weight:600;font-size:24px}
+  .page-head p{color:var(--ink-soft);font-style:italic;font-size:15px}
+
+  button.btn{font-family:'Fraunces',serif;font-size:15px;cursor:pointer;border-radius:11px;
+    padding:10px 16px;border:1px solid var(--accent);background:var(--accent);color:#fff;box-shadow:var(--shadow)}
+  button.btn.ghost{background:var(--paper);color:var(--accent)}
+  button.btn.small{padding:7px 12px;font-size:13px}
+
+  #map{height:300px;border-radius:var(--radius);border:1px solid var(--line);margin-bottom:22px;box-shadow:var(--shadow)}
+  .grid{display:grid;gap:16px}
+  .grid.countries{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+  .grid.flights{grid-template-columns:1fr}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);
+    padding:18px 20px;position:relative;cursor:pointer;transition:transform .15s}
+  .card:hover{transform:translateY(-2px)}
+  .card .del{position:absolute;top:12px;right:12px;border:none;background:none;color:var(--ink-soft);
+    cursor:pointer;font-size:18px;opacity:.4}
+  .card .del:hover{opacity:1;color:#b4544a}
+  .country-flag{font-size:38px}
+  .country-card h3{font-family:'Fraunces',serif;font-size:20px;font-weight:600;margin:6px 0 2px}
+  .country-card .when{color:var(--gold);font-size:14px;font-family:'Fraunces',serif}
+  .country-card .notes{color:var(--ink-soft);font-size:14px;margin-top:4px}
+  .flight-route{display:flex;align-items:center;gap:14px;font-family:'Fraunces',serif;font-size:22px;font-weight:600}
+  .flight-route .arrow{flex:1;height:1px;background:repeating-linear-gradient(90deg,var(--line) 0 6px,transparent 6px 12px)}
+  .flight-meta{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:12px;color:var(--ink-soft);font-size:15px}
+  .flight-meta b{color:var(--ink)}
+  .pill{background:var(--accent-soft);color:var(--accent);font-size:13px;padding:3px 10px;border-radius:20px;font-family:'Fraunces',serif}
+  .empty{text-align:center;color:var(--ink-soft);font-style:italic;padding:40px 20px;border:1px dashed var(--line);border-radius:var(--radius)}
+
+  .fab{position:fixed;right:26px;bottom:26px;z-index:40;width:60px;height:60px;border-radius:50%;border:none;
+    background:var(--accent);color:#fff;font-size:28px;cursor:pointer;box-shadow:0 8px 28px rgba(63,111,94,.4)}
+
+  .overlay{position:fixed;inset:0;background:rgba(44,42,38,.32);backdrop-filter:blur(3px);
+    display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+  .overlay.show{display:flex}
+  .modal{background:var(--paper);border-radius:20px;max-width:520px;width:100%;padding:26px;
+    box-shadow:0 24px 60px rgba(44,42,38,.25);max-height:90vh;overflow:auto}
+  .modal h3{font-family:'Fraunces',serif;font-size:21px;font-weight:600;margin-bottom:4px}
+  .modal .sub{color:var(--ink-soft);font-style:italic;font-size:14px;margin-bottom:14px}
+  label{display:block;font-family:'Fraunces',serif;font-size:14px;color:var(--ink-soft);margin:12px 0 5px}
+  input,textarea,select{width:100%;font-family:'Newsreader',serif;font-size:16px;padding:10px 12px;
+    border:1px solid var(--line);border-radius:11px;background:#fff;color:var(--ink);resize:vertical}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .budget-bar{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:20px 22px;margin-bottom:16px}
+  .budget-bar .nums{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px}
+  .budget-bar .spent{font-family:'Fraunces',serif;font-size:30px;font-weight:600}
+  .budget-bar .target{color:var(--ink-soft);font-style:italic}
+  .meter{height:8px;background:var(--accent-soft);border-radius:8px;margin-top:14px;overflow:hidden}
+  .meter span{display:block;height:100%;background:var(--accent);border-radius:8px;transition:width .4s}
+  .meter span.over{background:#b4544a}
+  .catwrap{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:16px 22px}
+  .catrow{display:flex;align-items:center;gap:10px;margin:7px 0;font-size:15px}
+  .catrow .cname{width:90px;color:var(--ink-soft);font-family:'Fraunces',serif;font-size:14px}
+  .catrow .cbar{flex:1;height:7px;background:var(--accent-soft);border-radius:6px;overflow:hidden}
+  .catrow .cbar span{display:block;height:100%;background:var(--gold)}
+  .catrow .camt{width:96px;text-align:right;color:var(--ink)}
+  .exp-cat{font-family:'Fraunces',serif;font-size:13px;color:var(--accent);background:var(--accent-soft);
+    padding:2px 9px;border-radius:14px}
+  .row{display:flex;gap:12px}.row>*{flex:1}
+  .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+  #cap-msg{color:var(--accent);font-size:14px;min-height:18px;margin-top:8px}
+  #cap-country-suggestions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .suggestion-chip{font-family:'Fraunces',serif;font-size:13px;padding:5px 13px;border-radius:16px;
+    border:1px solid var(--line);background:var(--paper);cursor:pointer;transition:all .15s}
+  .suggestion-chip:hover{border-color:var(--accent);color:var(--accent)}
+
+  .row-item{display:flex;justify-content:space-between;align-items:center;padding:13px 4px;
+    border-bottom:1px solid var(--line);cursor:pointer;font-size:17px}
+  .row-item .chev{color:var(--ink-soft)}
+  .wx{background:var(--accent-soft);border-radius:12px;padding:12px 14px;margin-bottom:12px;color:var(--accent)}
+  .wx-now{font-family:'Fraunces',serif;font-size:20px;font-weight:600}
+  .wx-days{display:flex;gap:16px;margin-top:8px;font-size:14px;text-align:center}
+  .srclink{display:inline-block;color:var(--gold);font-size:14px;margin-bottom:12px;text-decoration:none}
+  .ai-block{border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:6px}
+  .ai-head{display:flex;justify-content:space-between;align-items:center;font-family:'Fraunces',serif;font-weight:600;margin-bottom:10px}
+  .ai-out{white-space:pre-wrap;color:var(--ink);font-size:15.5px;line-height:1.55}
+  footer{text-align:center;color:var(--ink-soft);font-size:13px;font-style:italic;padding:30px 0}
+
+  /* COUNTRY DETAIL */
+  .country-days-row{display:flex;align-items:center;gap:8px;background:var(--accent-soft);
+    border-radius:12px;padding:12px 14px;margin-bottom:16px}
+  .country-days-row span{font-family:'Fraunces',serif;font-size:14px;color:var(--ink-soft)}
+  .country-days-row input{width:60px;text-align:center;font-size:15px;padding:5px 8px;
+    border:1px solid var(--line);border-radius:8px}
+  .places-header{font-family:'Fraunces',serif;font-weight:600;font-size:15px;margin:4px 0 10px}
+  .place-item{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line)}
+  .place-item-name{flex:1;font-size:15px;cursor:pointer}
+  .place-item-name:hover{color:var(--accent)}
+  .place-days-input{width:52px;text-align:center;font-size:14px;padding:4px 6px;
+    border:1px solid var(--line);border-radius:8px}
+  .place-days-unit{color:var(--ink-soft);font-size:13px}
+  .places-total{font-size:14px;color:var(--ink-soft);padding:10px 0 4px}
+  .time-warning{background:#fff8f0;border:1px solid #e8c97a;border-radius:12px;
+    padding:12px 14px;margin:10px 0;font-size:14px;line-height:1.55}
+  .add-place-row{display:flex;gap:8px;margin-top:14px;align-items:center}
+  .add-place-row input{font-family:'Newsreader',serif;font-size:15px;padding:8px 12px;
+    border:1px solid var(--line);border-radius:10px}
+  .add-place-row input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+
+  /* AIRPORT AUTOCOMPLETE */
+  .airport-wrap{position:relative;flex:1}
+  .airport-dropdown{position:absolute;top:calc(100% + 2px);left:0;right:0;background:var(--paper);
+    border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);
+    z-index:200;max-height:200px;overflow-y:auto;display:none}
+  .airport-dropdown.open{display:block}
+  .airport-opt{padding:8px 12px;cursor:pointer;display:flex;align-items:baseline;gap:10px;font-size:14px}
+  .airport-opt:hover{background:var(--accent-soft)}
+  .airport-iata{font-family:'Fraunces',serif;font-weight:700;font-size:15px;min-width:38px;color:var(--ink)}
+  .airport-info{color:var(--ink-soft);font-size:13px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .airport-badge{font-size:11px;color:var(--gold);flex-shrink:0}
+  .airport-hint{font-size:12px;color:var(--ink-soft);font-style:italic;margin-top:3px;min-height:15px}
+
+  /* RESEARCH */
+  .research-section{margin-top:34px;padding-top:26px;border-top:1px solid var(--line)}
+  .research-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px}
+  .research-head h3{font-family:'Fraunces',serif;font-weight:600;font-size:20px}
+  .research-card{cursor:default}
+  .research-img{width:100%;max-height:200px;object-fit:cover;border-radius:10px;margin-bottom:10px;cursor:zoom-in}
+  .research-text{white-space:pre-wrap;font-size:15px;line-height:1.55;margin-bottom:8px}
+  .research-link{display:inline-flex;align-items:center;gap:5px;color:var(--gold);font-size:14px;
+    text-decoration:none;border:1px solid var(--line);border-radius:20px;padding:3px 12px;margin-bottom:6px}
+  .research-link:hover{border-color:var(--gold)}
+  .research-date{color:var(--ink-soft);font-size:12px;margin-top:6px;font-style:italic}
+  #r-image-preview{display:none;width:100%;border-radius:10px;margin-top:8px;object-fit:cover;max-height:180px}
+  input[type=file]{font-size:14px;color:var(--ink-soft);margin-top:6px;width:100%}
+  .ef-header{font-family:'Fraunces',serif;font-size:13px;color:var(--ink-soft);margin:12px 0 8px;
+    display:flex;align-items:center;gap:8px}
+  .ef-analyzing{color:var(--accent);font-style:italic}
+  .ef-card{background:var(--accent-soft);border:1px solid var(--line);border-radius:12px;
+    padding:12px 14px;margin-bottom:8px}
+  .ef-route{font-family:'Fraunces',serif;font-size:17px;font-weight:600;margin-bottom:4px}
+  .ef-meta{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--ink-soft)}
+  .ef-price{font-family:'Fraunces',serif;font-size:15px;color:var(--gold);font-weight:600;margin-top:6px}
+  .ef-del{position:absolute;top:8px;right:10px;border:none;background:none;color:var(--ink-soft);
+    cursor:pointer;font-size:16px;opacity:.4;line-height:1}
+  .ef-del:hover{opacity:1;color:#b4544a}
+  .ef-add-btn{margin-top:10px;font-family:'Fraunces',serif;font-size:13px;padding:5px 13px;
+    border-radius:16px;border:1px solid var(--accent);color:var(--accent);background:none;
+    cursor:pointer;transition:all .15s}
+  .ef-add-btn:hover{background:var(--accent);color:#fff}
+  .ef-add-btn:disabled{border-color:var(--ink-soft);color:var(--ink-soft);cursor:default}
+
+  /* PREVIEW */
+  #ov-preview{padding:0;align-items:stretch}
+  #preview-map{width:100%;height:100%}
+  .preview-close{position:absolute;top:18px;right:18px;z-index:10;width:38px;height:38px;
+    border-radius:50%;border:none;background:rgba(255,255,255,.15);backdrop-filter:blur(6px);
+    color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .preview-close:hover{background:rgba(255,255,255,.28)}
+  #preview-loading{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    color:#fff;font-family:'Fraunces',serif;font-size:20px;background:rgba(11,11,25,.7);z-index:5}
+  #preview-card{position:absolute;bottom:44px;left:50%;transform:translateX(-50%);
+    background:rgba(255,253,249,.93);backdrop-filter:blur(8px);border-radius:18px;
+    padding:16px 28px;min-width:260px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.22);
+    opacity:0;transition:opacity .4s;pointer-events:none}
+  #preview-card.show{opacity:1}
+  .pc-step{font-size:11px;color:var(--ink-soft);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+  .pc-route{font-family:'Fraunces',serif;font-size:22px;font-weight:600;margin-bottom:4px}
+  .pc-detail{color:var(--ink-soft);font-size:14px;margin-top:2px}
+  .pc-price{font-family:'Fraunces',serif;font-size:18px;color:var(--gold);margin-top:8px;font-weight:600}
+  .pc-label{font-family:'Fraunces',serif;font-size:18px;font-weight:600}
+  .preview-dot{width:14px;height:14px;border-radius:50%;background:#c2924a;
+    border:2.5px solid #fff;box-shadow:0 0 0 0 rgba(194,146,74,.5);
+    animation:pdot 1.4s infinite}
+  @keyframes pdot{0%{box-shadow:0 0 0 0 rgba(194,146,74,.5)}
+    70%{box-shadow:0 0 0 10px rgba(194,146,74,0)}100%{box-shadow:0 0 0 0 rgba(194,146,74,0)}}
+
+  /* TRIP ONBOARDING */
+  #trip-onboarding{display:none;min-height:100vh;align-items:center;justify-content:center;padding:20px}
+  .setup-divider{text-align:center;color:var(--ink-soft);font-size:13px;font-style:italic;
+    margin:20px 0;display:flex;align-items:center;gap:10px}
+  .setup-divider::before,.setup-divider::after{content:'';flex:1;height:1px;background:var(--line)}
+
+  /* TRIP CAROUSEL */
+  .trip-carousel{display:flex;gap:8px;padding:14px 0 2px;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
+  .trip-carousel::-webkit-scrollbar{display:none}
+  .trip-chip{flex-shrink:0;font-family:'Fraunces',serif;font-size:14px;padding:7px 18px;
+    border-radius:20px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);
+    cursor:pointer;white-space:nowrap;transition:all .15s}
+  .trip-chip:hover{border-color:var(--accent);color:var(--accent)}
+  .trip-chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .trip-chip.add{border-style:dashed}
+</style>
+</head>
+<body>
+
+<!-- AUTH SCREEN -->
+<div id="auth">
+  <div class="authcard">
+    <span class="dot"></span>
+    <h1>TriPlanner</h1>
+    <small>our trip, together</small>
+    <input id="au-email" type="email" placeholder="email" autocomplete="email">
+    <input id="au-pass" type="password" placeholder="password" autocomplete="current-password">
+    <div class="au-btns">
+      <button class="btn ghost" style="flex:1" onclick="doSignup()">Sign up</button>
+      <button class="btn" style="flex:1" onclick="doLogin()">Log in</button>
+    </div>
+    <div id="au-msg"></div>
+    <div style="margin-top:18px;border-top:1px solid var(--line);padding-top:16px">
+      <button class="btn ghost" style="width:100%;color:var(--ink-soft)" onclick="enterAsGuest()">Continue as guest</button>
+      <div style="color:var(--ink-soft);font-size:12px;margin-top:8px;font-style:italic">No account needed · data stays on this device only</div>
+    </div>
+  </div>
+</div>
+
+<!-- TRIP ONBOARDING (shown after signup/login when user has no trips yet) -->
+<div id="trip-onboarding" style="display:none;min-height:100vh;align-items:center;justify-content:center;padding:20px">
+  <div class="authcard" style="max-width:460px;text-align:left">
+    <div style="text-align:center;margin-bottom:20px">
+      <span class="dot"></span>
+      <h1 style="font-size:26px;font-family:'Fraunces',serif;font-weight:600;margin:8px 0 4px">Your first trip</h1>
+      <small style="color:var(--ink-soft);font-style:italic">Create one or join a friend's</small>
+    </div>
+
+    <label>Trip name</label>
+    <input id="new-trip-name" placeholder="Asia 2026">
+    <button class="btn" style="width:100%;margin-top:10px" onclick="doCreateTrip()">Create trip</button>
+
+    <div class="setup-divider">or join an existing trip</div>
+
+    <label>Trip owner's email</label>
+    <input id="join-email" type="email" placeholder="friend@example.com">
+    <label>Trip name</label>
+    <input id="join-trip-name" placeholder="Asia 2026">
+    <button class="btn ghost" style="width:100%;margin-top:10px" onclick="doJoinTrip()">Join trip</button>
+
+    <div id="trip-onboarding-msg" style="color:var(--ink-soft);font-size:13px;margin-top:14px;min-height:18px;text-align:center"></div>
+
+    <div style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px;text-align:center">
+      <button class="btn ghost" style="color:var(--ink-soft);font-size:13px" onclick="doLogout()">← Back to login</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none">
+  <div class="wrap">
+    <header class="top">
+      <div class="brand"><span class="dot"></span><h1>TriPlanner</h1><small>our trip, together</small></div>
+      <div class="top-actions">
+        <button class="btn ghost" onclick="suggestItinerary()">✦ Plan</button>
+        <button class="btn ghost" onclick="previewTrip()">▶ Preview trip</button>
+        <button class="btn ghost" onclick="openCapture()">＋ Capture</button>
+        <button id="logout-btn" class="btn ghost" onclick="doLogout()">Log out</button>
+      </div>
+    </header>
+    <div id="trip-carousel" class="trip-carousel" style="display:none"></div>
+    <nav class="tabs">
+      <button class="active" data-tab="countries" onclick="showTab('countries')">Countries</button>
+      <button data-tab="flights" onclick="showTab('flights')">Flights</button>
+      <button data-tab="budget" onclick="showTab('budget')">Budget</button>
+    </nav>
+
+    <section class="page active" id="page-countries">
+      <div class="page-head">
+        <div><h2>Countries</h2><p>Places you want to visit.</p></div>
+        <button class="btn" onclick="openCapture()">＋ Add place</button>
+      </div>
+      <div class="grid countries" id="countryList"></div>
+    </section>
+
+    <section class="page" id="page-flights">
+      <div class="page-head">
+        <div><h2>Flights</h2><p>Every leg, in one calm place.</p></div>
+        <button class="btn" onclick="openFlight()">＋ Add flight</button>
+      </div>
+      <div class="grid flights" id="flightList"></div>
+
+      <div class="research-section">
+        <div class="research-head">
+          <h3>Research</h3>
+          <button class="btn ghost small" onclick="openResearch()">＋ Add note</button>
+        </div>
+        <div class="grid flights" id="researchList"></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-budget">
+      <div class="page-head">
+        <div><h2>Budget</h2><p>What we're spending, and where.</p></div>
+        <div style="display:flex;gap:10px">
+          <button class="btn ghost" onclick="openBudgetTarget()">Set target</button>
+          <button class="btn" onclick="openExpense()">＋ Add expense</button>
+        </div>
+      </div>
+      <div id="budgetSummary"></div>
+      <div id="budgetByCat"></div>
+      <div class="grid flights" id="expenseList" style="margin-top:18px"></div>
+    </section>
+
+    <footer>Shared between both of you · saved to your Supabase project.</footer>
+  </div>
+  <button class="fab" onclick="openCapture()">＋</button>
+</div>
+
+<!-- AI Plan modal -->
+<div class="overlay" id="ov-plan"><div class="modal">
+  <h3>Trip plan</h3>
+  <div id="plan-ai-out" class="ai-out" style="min-height:60px">Asking Claude…</div>
+  <div class="modal-actions"><button class="btn ghost" onclick="closeAll()">Close</button></div>
+</div></div>
+
+<!-- Capture modal -->
+<div class="overlay" id="ov-capture"><div class="modal">
+  <h3>Capture a place</h3>
+  <label>Place</label>
+  <input id="cap-place" placeholder="Hoi An" oninput="onPlaceInput()" autocomplete="off">
+  <label style="display:flex;align-items:center;gap:6px">
+    Country
+    <span id="cap-country-status" style="font-family:'Newsreader',serif;font-weight:400;font-style:italic;color:var(--ink-soft);font-size:13px"></span>
+  </label>
+  <input id="cap-country" placeholder="auto-detected · or type manually" autocomplete="off">
+  <div id="cap-country-suggestions"></div>
+  <label>Link (optional)</label>
+  <input id="cap-url" placeholder="https://instagram.com/...">
+  <div id="cap-msg"></div>
+  <div class="modal-actions">
+    <button class="btn ghost" onclick="closeAll()">Cancel</button>
+    <button class="btn" onclick="runCapture()">File it</button>
+  </div>
+</div></div>
+
+<!-- Detail modal (country or city) -->
+<div class="overlay" id="ov-detail"><div class="modal">
+  <h3 id="detailTitle"></h3>
+  <div id="detailBody"></div>
+  <div class="modal-actions"><button class="btn" onclick="closeAll()">Save and close</button></div>
+</div></div>
+
+<!-- Flight modal -->
+<div class="overlay" id="ov-flight"><div class="modal">
+  <h3>Add flight</h3><div class="sub">Fill what you know.</div>
+  <div class="row">
+    <div class="airport-wrap"><label>From</label>
+      <input id="f-origin" placeholder="city or code" autocomplete="off" oninput="airportInput('f-origin','f-origin-drop','f-origin-hint')">
+      <div id="f-origin-drop" class="airport-dropdown"></div>
+      <div id="f-origin-hint" class="airport-hint"></div>
+    </div>
+    <div class="airport-wrap"><label>To</label>
+      <input id="f-destination" placeholder="city or code" autocomplete="off" oninput="airportInput('f-destination','f-destination-drop','f-destination-hint')">
+      <div id="f-destination-drop" class="airport-dropdown"></div>
+      <div id="f-destination-hint" class="airport-hint"></div>
+    </div>
+  </div>
+  <div class="row"><div><label>Airline</label><input id="f-airline"></div>
+    <div><label>Flight no.</label><input id="f-flight_no"></div></div>
+  <div class="row"><div><label>Date</label><input id="f-depart_date"></div>
+    <div><label>Time</label><input id="f-depart_time"></div></div>
+  <label>Price</label><input id="f-price">
+  <label>Notes</label><textarea id="f-notes" rows="2"></textarea>
+  <div class="modal-actions"><button class="btn ghost" onclick="closeAll()">Cancel</button>
+    <button id="f-save-btn" class="btn" onclick="saveFlight()">Save flight</button></div>
+</div></div>
+
+<!-- Expense + target modals -->
+<div class="overlay" id="ov-expense"><div class="modal">
+  <h3>Add expense</h3><div class="sub">Track what you've spent.</div>
+  <label>What for</label><input id="e-label" placeholder="Hotel in Hoi An">
+  <div class="row">
+    <div><label>Amount</label><input id="e-amount" type="number" inputmode="decimal" placeholder="240"></div>
+    <div><label>Currency</label><input id="e-currency" placeholder="USD"></div>
+  </div>
+  <div class="row">
+    <div><label>Category</label>
+      <select id="e-category">
+        <option>Flights</option><option>Lodging</option><option>Food</option>
+        <option>Transport</option><option>Activities</option><option>Nanny</option>
+        <option selected>Other</option>
+      </select></div>
+    <div><label>Date</label><input id="e-date" type="date"></div>
+  </div>
+  <label>Country (optional)</label>
+  <select id="e-country"></select>
+  <label>Notes</label><textarea id="e-notes" rows="2"></textarea>
+  <div class="modal-actions"><button class="btn ghost" onclick="closeAll()">Cancel</button>
+    <button class="btn" onclick="saveExpense()">Save expense</button></div>
+</div></div>
+
+<div class="overlay" id="ov-target"><div class="modal">
+  <h3>Trip budget target</h3><div class="sub">An overall number to track against (optional).</div>
+  <div class="row">
+    <div><label>Total budget</label><input id="t-total" type="number" inputmode="decimal" placeholder="8000"></div>
+    <div><label>Base currency</label><input id="t-currency" placeholder="USD"></div>
+  </div>
+  <div class="modal-actions"><button class="btn ghost" onclick="closeAll()">Cancel</button>
+    <button class="btn" onclick="saveBudgetTarget()">Save</button></div>
+</div></div>
+
+<!-- Manage trips overlay -->
+<div class="overlay" id="ov-trips"><div class="modal">
+  <h3>Trips</h3>
+  <div class="sub">Create a new trip or join someone else's</div>
+
+  <label>New trip name</label>
+  <input id="mt-new-name" placeholder="Europe 2027">
+  <div class="modal-actions" style="margin-top:10px">
+    <button class="btn" onclick="doCreateTrip()">Create trip</button>
+  </div>
+
+  <div class="setup-divider" style="margin:20px 0">or join an existing trip</div>
+
+  <label>Trip owner's email</label>
+  <input id="mt-join-email" type="email" placeholder="friend@example.com">
+  <label>Trip name</label>
+  <input id="mt-join-name" placeholder="Europe 2027">
+  <div class="modal-actions" style="margin-top:10px">
+    <button class="btn ghost" onclick="doJoinTrip()">Join trip</button>
+  </div>
+
+  <div id="trips-modal-msg" style="color:var(--ink-soft);font-size:13px;margin-top:12px;min-height:18px"></div>
+  <div class="modal-actions"><button class="btn ghost" onclick="closeAll()">Close</button></div>
+</div></div>
+
+<!-- Research modal -->
+<div class="overlay" id="ov-research" onpaste="onResearchPaste(event)"><div class="modal">
+  <h3>Research note</h3>
+  <div class="sub">Save anything useful — notes, a screenshot, or a booking link.</div>
+  <label>Notes</label>
+  <textarea id="r-content" rows="3" placeholder="e.g. El Al direct TLV→BKK, Nov 15 · $420/person · 11h non-stop"></textarea>
+  <label>Screenshot or image <span style="font-weight:400;font-style:italic;color:var(--ink-soft)">— upload or paste (⌘V / Ctrl+V)</span></label>
+  <input type="file" id="r-image-input" accept="image/*" onchange="onResearchImagePick(this)">
+  <img id="r-image-preview">
+  <div id="r-extracted"></div>
+  <label>Link</label>
+  <input id="r-link-url" type="url" placeholder="https://www.google.com/flights/...">
+  <label>Link label (optional)</label>
+  <input id="r-link-label" placeholder="Google Flights TLV → BKK">
+  <div id="r-msg" style="color:#b4544a;font-size:13px;min-height:16px;margin-top:8px"></div>
+  <div class="modal-actions">
+    <button class="btn ghost" onclick="closeAll()">Cancel</button>
+    <button class="btn" onclick="saveResearch()">Save</button>
+  </div>
+</div></div>
+
+<!-- Preview overlay -->
+<div class="overlay" id="ov-preview">
+  <div style="position:relative;width:100%;height:100%">
+    <div id="preview-map"></div>
+    <button class="preview-close" onclick="closePreview()">✕</button>
+    <div id="preview-loading">Loading your trip…</div>
+    <div id="preview-card"></div>
+  </div>
+</div>
+
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
