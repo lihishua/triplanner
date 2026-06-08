@@ -42,12 +42,15 @@ Flights:
 ${flightsText}
 ${prefText ? `\nTravel style: ${prefText}` : ''}
 
-Give a short, practical suggestion covering:
-1. Suggested order and rough date ranges for each destination
-2. Any timing concerns (too rushed, gaps between flights, etc.)
-3. One or two extra places worth adding based on this route, if relevant
+Give practical advice. Return a JSON object with exactly two fields:
 
-Keep it under 180 words. Be warm, specific, and practical. No markdown headers.`;
+"suggestion": A narrative (under 200 words, markdown ok) covering: suggested order + date ranges, timing concerns, flight gaps to book.
+
+"actionable": Array of specific countries/destinations worth adding to this trip (max 3). Each item:
+  { "name": "Philippines", "days": 12, "reason": "one short sentence why it fits" }
+  Only include places NOT already in the destinations list above. Empty array if nothing to add.
+
+Return only valid JSON, no other text.`;
 
     const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -58,19 +61,28 @@ Keep it under 180 words. Be warm, specific, and practical. No markdown headers.`
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 400,
+        max_tokens: 600,
         messages: [{ role: "user", content: prompt }],
       }),
     });
 
     const data = await r.json();
-    const suggestion = (data.content || [])
+    const raw = (data.content || [])
       .filter((b: any) => b.type === "text")
       .map((b: any) => b.text)
-      .join("")
-      .trim();
+      .join("").trim();
 
-    return json({ suggestion: suggestion || "No suggestion returned." });
+    let suggestion = raw, actionable: any[] = [];
+    try {
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (match) {
+        const parsed = JSON.parse(match[0]);
+        suggestion = parsed.suggestion || raw;
+        actionable = Array.isArray(parsed.actionable) ? parsed.actionable : [];
+      }
+    } catch (_) {}
+
+    return json({ suggestion, actionable });
   } catch (e) {
     return json({ error: String(e) }, 500);
   }

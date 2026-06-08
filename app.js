@@ -442,7 +442,7 @@ async function suggestItinerary() {
 async function generatePlan() {
   const out = document.getElementById('plan-ai-out');
   out.style.display = 'block';
-  out.textContent = 'Asking Claude…';
+  out.innerHTML = '<em style="color:var(--ink-soft)">Asking Claude…</em>';
 
   const placesData = countries.map(c => ({
     name: c.name, planned_days: c.planned_days || null,
@@ -457,12 +457,42 @@ async function generatePlan() {
     const { data, error } = await sb.functions.invoke('plan-trip', {
       body: { places: placesData, flights: flightsData, preferences: tripPreferences },
     });
-    out.textContent = error
-      ? (error.message || JSON.stringify(error))
-      : (data?.suggestion || 'No suggestion returned.');
+    if (error) { out.textContent = error.message || JSON.stringify(error); return; }
+
+    // Render narrative
+    out.innerHTML = `<div style="white-space:pre-wrap;line-height:1.6">${esc(data.suggestion || '')}</div>`;
+
+    // Render actionable suggestions
+    const suggestions = data.actionable || [];
+    if (suggestions.length) {
+      out.innerHTML += `<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">
+        <div style="font-family:'Fraunces',serif;font-weight:600;font-size:14px;margin-bottom:10px;color:var(--ink-soft)">Worth adding</div>
+        ${suggestions.map((s, i) => `
+          <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)">
+            <div style="flex:1">
+              <span style="font-family:'Fraunces',serif;font-weight:600;font-size:16px">${esc(s.name)}</span>
+              ${s.days ? `<span style="color:var(--ink-soft);font-size:13px;margin-left:8px">~${s.days} days</span>` : ''}
+              <div style="color:var(--ink-soft);font-size:13px;margin-top:2px">${esc(s.reason || '')}</div>
+            </div>
+            <button id="sugg-btn-${i}" class="btn small" onclick="addSuggestedCountry('${esc(s.name)}',${s.days||0},${i})">✓ Add</button>
+          </div>`).join('')}
+      </div>`;
+    }
   } catch (e) {
     out.textContent = 'Error: ' + String(e);
   }
+}
+
+async function addSuggestedCountry(name, days, btnIdx) {
+  const country = await ensureCountry(cap(name), FLAGS[name.toLowerCase()] || '🌍');
+  if (country && days) {
+    country.planned_days = days;
+    if (!GUEST_MODE) await sb.from('countries').update({ planned_days: days }).eq('id', country.id);
+    else lsUpdate('countries', country.id, { planned_days: days });
+  }
+  await refreshAll();
+  const btn = document.getElementById('sugg-btn-' + btnIdx);
+  if (btn) { btn.textContent = '✓ Added'; btn.disabled = true; btn.classList.add('ghost'); }
 }
 
 /* ---------------- COUNTRY + CITY DETAIL ---------------- */
