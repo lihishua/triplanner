@@ -1,0 +1,17 @@
+{
+  "name": "TriPlanner",
+  "short_name": "TriPlanner",
+  "description": "Plan your trip together",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f7f5f0",
+  "theme_color": "#3f6f5e",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
