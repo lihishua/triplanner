@@ -412,8 +412,8 @@
   </label>
   <input id="cap-country" placeholder="auto-detected · or type manually" autocomplete="off">
   <div id="cap-country-suggestions"></div>
-  <label>Link (optional)</label>
-  <input id="cap-url" placeholder="https://instagram.com/...">
+  <label>Link <span id="cap-url-status" style="font-family:'Newsreader',serif;font-weight:400;font-style:italic;color:var(--accent);font-size:13px"></span></label>
+  <input id="cap-url" placeholder="paste Instagram, TikTok, YouTube or any link…" oninput="onUrlInput()">
   <div id="cap-msg"></div>
   <div class="modal-actions">
     <button class="btn ghost" onclick="closeAll()">Cancel</button>

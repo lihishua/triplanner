@@ -258,6 +258,40 @@ async function geocode(q) {
 
 /* ---------------- CAPTURE (place → auto-detect country) ---------------- */
 let _placeDebounce = null;
+let _urlDebounce   = null;
+
+function onUrlInput() {
+  clearTimeout(_urlDebounce);
+  const url = document.getElementById('cap-url').value.trim();
+  if (!url.startsWith('http')) return;
+  // Only trigger if place is still empty
+  if (document.getElementById('cap-place').value.trim()) return;
+  document.getElementById('cap-url-status').textContent = 'extracting…';
+  _urlDebounce = setTimeout(() => parseLink(url), 800);
+}
+
+async function parseLink(url) {
+  const statusEl = document.getElementById('cap-url-status');
+  if (GUEST_MODE) { statusEl.textContent = '(sign in to auto-extract)'; return; }
+  try {
+    const { data, error } = await sb.functions.invoke('parse-link', { body: { url } });
+    statusEl.textContent = '';
+    if (error || (!data?.place && !data?.country)) return;
+    if (data.place && !document.getElementById('cap-place').value.trim()) {
+      document.getElementById('cap-place').value = data.place;
+    }
+    if (data.country && !document.getElementById('cap-country').value.trim()) {
+      document.getElementById('cap-country').value = data.country;
+      document.getElementById('cap-country-suggestions').innerHTML = '';
+    }
+    if (data.place || data.country) {
+      statusEl.textContent = '✓ extracted';
+      setTimeout(() => { statusEl.textContent = ''; }, 2000);
+    }
+  } catch (e) {
+    statusEl.textContent = '';
+  }
+}
 
 function onPlaceInput() {
   clearTimeout(_placeDebounce);
