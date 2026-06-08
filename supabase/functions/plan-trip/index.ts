@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
   try {
-    const { places, flights } = await req.json();
+    const { places, flights, preferences } = await req.json();
     const key = Deno.env.get("ANTHROPIC_API_KEY");
     if (!key) return json({ error: "AI key not configured." }, 503);
 
@@ -27,6 +27,12 @@ Deno.serve(async (req) => {
         ).join("\n")
       : "No flights added yet.";
 
+    const prefText = preferences ? [
+      preferences.likes?.length   ? `They love: ${preferences.likes.join(', ')}.`   : '',
+      preferences.dislikes?.length ? `They prefer to avoid: ${preferences.dislikes.join(', ')}.` : '',
+      preferences.notes ? `Notes: ${preferences.notes}.` : '',
+    ].filter(Boolean).join(' ') : '';
+
     const prompt = `You are helping plan a family trip. Here is what's planned so far:
 
 Destinations:
@@ -34,6 +40,7 @@ ${placesText}
 
 Flights:
 ${flightsText}
+${prefText ? `\nTravel style: ${prefText}` : ''}
 
 Give a short, practical suggestion covering:
 1. Suggested order and rough date ranges for each destination

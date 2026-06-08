@@ -124,6 +124,7 @@ async function enterTrip(trip) {
   document.getElementById('app').style.display = 'block';
   renderTripCarousel();
   await refreshAll();
+  await loadPreferences();
 }
 
 function renderTripCarousel() {
@@ -355,9 +356,94 @@ function renderCountries() {
   }
 }
 
+/* ---------------- TRAVEL PREFERENCES ---------------- */
+let tripPreferences = { likes: [], dislikes: [], notes: '' };
+
+const PREF_LIKE_SUGGESTIONS = ['Nature & outdoors','Beaches','Mountains','Scenic views','National parks',
+  'Luxury hotels','Local food','Kid-friendly','Adventure','Quiet places','Boutique stays','Swimming'];
+const PREF_DISLIKE_SUGGESTIONS = ['Crowded cities','Tourist traps','Long drives','Party scene',
+  'Museums','Very hot weather','Cold weather','Busy markets'];
+
+function renderPrefChips() {
+  const likesEl   = document.getElementById('pref-likes');
+  const dislikesEl = document.getElementById('pref-dislikes');
+  if (!likesEl) return;
+
+  likesEl.innerHTML = tripPreferences.likes.map((t, i) =>
+    `<span class="pref-chip like">${esc(t)}<button onclick="removePref('like',${i})">×</button></span>`
+  ).join('');
+  dislikesEl.innerHTML = tripPreferences.dislikes.map((t, i) =>
+    `<span class="pref-chip dislike">${esc(t)}<button onclick="removePref('dislike',${i})">×</button></span>`
+  ).join('');
+
+  // Suggestions (hide ones already added)
+  const likeSugg    = PREF_LIKE_SUGGESTIONS.filter(s => !tripPreferences.likes.includes(s));
+  const dislikeSugg = PREF_DISLIKE_SUGGESTIONS.filter(s => !tripPreferences.dislikes.includes(s));
+
+  document.getElementById('pref-like-sugg').innerHTML =
+    likeSugg.map(s => `<button class="pref-sugg" onclick="quickAddPref('like','${esc(s)}')">${esc(s)}</button>`).join('');
+  document.getElementById('pref-dislike-sugg').innerHTML =
+    dislikeSugg.map(s => `<button class="pref-sugg" onclick="quickAddPref('dislike','${esc(s)}')">${esc(s)}</button>`).join('');
+
+  document.getElementById('pref-notes').value = tripPreferences.notes || '';
+}
+
+function addPref(type) {
+  const inputId = type === 'like' ? 'pref-like-input' : 'pref-dislike-input';
+  const text = document.getElementById(inputId).value.trim();
+  if (!text) return;
+  document.getElementById(inputId).value = '';
+  tripPreferences[type === 'like' ? 'likes' : 'dislikes'].push(text);
+  renderPrefChips();
+  savePreferences();
+}
+
+function quickAddPref(type, text) {
+  tripPreferences[type === 'like' ? 'likes' : 'dislikes'].push(text);
+  renderPrefChips();
+  savePreferences();
+}
+
+function removePref(type, idx) {
+  const key = type === 'like' ? 'likes' : 'dislikes';
+  tripPreferences[key].splice(idx, 1);
+  renderPrefChips();
+  savePreferences();
+}
+
+function savePrefNotes() {
+  tripPreferences.notes = document.getElementById('pref-notes').value;
+  savePreferences();
+}
+
+async function savePreferences() {
+  if (GUEST_MODE) { lsUpdate('trips_prefs', TRIP_ID, tripPreferences); return; }
+  await sb.from('trips').update({ preferences: tripPreferences }).eq('id', TRIP_ID);
+}
+
+async function loadPreferences() {
+  if (!TRIP_ID) return;
+  if (GUEST_MODE) {
+    const stored = lsGet('trips_prefs').find(r => r.id === TRIP_ID);
+    tripPreferences = { likes: [], dislikes: [], notes: '', ...(stored || {}) };
+    return;
+  }
+  const { data } = await sb.from('trips').select('preferences').eq('id', TRIP_ID).single();
+  tripPreferences = { likes: [], dislikes: [], notes: '', ...(data?.preferences || {}) };
+}
+
 async function suggestItinerary() {
   openOverlay('ov-plan');
-  document.getElementById('plan-ai-out').textContent = 'Asking Claude…';
+  await loadPreferences();
+  renderPrefChips();
+  document.getElementById('plan-ai-out').style.display = 'none';
+}
+
+async function generatePlan() {
+  const out = document.getElementById('plan-ai-out');
+  out.style.display = 'block';
+  out.textContent = 'Asking Claude…';
+
   const placesData = countries.map(c => ({
     name: c.name, planned_days: c.planned_days || null,
     places: places.filter(ci => ci.country_id === c.id)
@@ -369,13 +455,13 @@ async function suggestItinerary() {
   }));
   try {
     const { data, error } = await sb.functions.invoke('plan-trip', {
-      body: { places: placesData, flights: flightsData },
+      body: { places: placesData, flights: flightsData, preferences: tripPreferences },
     });
-    document.getElementById('plan-ai-out').textContent =
-      error ? (error.message || JSON.stringify(error))
+    out.textContent = error
+      ? (error.message || JSON.stringify(error))
       : (data?.suggestion || 'No suggestion returned.');
   } catch (e) {
-    document.getElementById('plan-ai-out').textContent = 'Error: ' + String(e);
+    out.textContent = 'Error: ' + String(e);
   }
 }
 

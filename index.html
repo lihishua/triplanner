@@ -147,6 +147,26 @@
     border:1px solid var(--line);border-radius:10px}
   .add-place-row input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 
+  /* TRAVEL PREFERENCES */
+  .pref-group{margin:12px 0 16px}
+  .pref-label{font-family:'Fraunces',serif;font-weight:600;font-size:14px;margin-bottom:8px}
+  .pref-like-label{color:#3f6f5e}
+  .pref-dislike-label{color:#b4544a}
+  .pref-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;min-height:10px}
+  .pref-chip{display:flex;align-items:center;gap:5px;font-size:13px;padding:4px 10px;border-radius:16px;cursor:default}
+  .pref-chip.like{background:#e8efe9;color:#3f6f5e;border:1px solid #c2d8c6}
+  .pref-chip.dislike{background:#fdf0ee;color:#b4544a;border:1px solid #f0c8c0}
+  .pref-chip button{border:none;background:none;cursor:pointer;font-size:13px;opacity:.5;padding:0;line-height:1}
+  .pref-chip button:hover{opacity:1}
+  .pref-suggestions{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
+  .pref-sugg{font-size:12px;padding:3px 10px;border-radius:14px;border:1px dashed var(--line);
+    background:none;cursor:pointer;color:var(--ink-soft);font-family:'Fraunces',serif}
+  .pref-sugg:hover{border-color:var(--accent);color:var(--accent)}
+  .pref-add-row{display:flex;gap:8px;align-items:center}
+  .pref-add-row input{flex:1;font-size:14px;padding:6px 10px;border:1px solid var(--line);
+    border-radius:8px;font-family:'Newsreader',serif}
+  .pref-add-row input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+
   /* AIRPORT AUTOCOMPLETE */
   .airport-wrap{position:relative;flex:1}
   .airport-dropdown{position:absolute;top:calc(100% + 2px);left:0;right:0;background:var(--paper);
@@ -347,8 +367,40 @@
 <!-- AI Plan modal -->
 <div class="overlay" id="ov-plan"><div class="modal">
   <h3>Trip plan</h3>
-  <div id="plan-ai-out" class="ai-out" style="min-height:60px">Asking Claude…</div>
-  <div class="modal-actions"><button class="btn ghost" onclick="closeAll()">Close</button></div>
+  <div class="sub">Tell Claude about your travel style so suggestions fit your family.</div>
+
+  <div class="pref-group">
+    <div class="pref-label pref-like-label">✓ We love</div>
+    <div id="pref-likes" class="pref-chips"></div>
+    <div class="pref-suggestions" id="pref-like-sugg"></div>
+    <div class="pref-add-row">
+      <input id="pref-like-input" placeholder="nature, beaches, great views…"
+        onkeydown="if(event.key==='Enter')addPref('like')">
+      <button class="btn small" onclick="addPref('like')">Add</button>
+    </div>
+  </div>
+
+  <div class="pref-group">
+    <div class="pref-label pref-dislike-label">✗ Not for us</div>
+    <div id="pref-dislikes" class="pref-chips"></div>
+    <div class="pref-suggestions" id="pref-dislike-sugg"></div>
+    <div class="pref-add-row">
+      <input id="pref-dislike-input" placeholder="crowded cities, long drives…"
+        onkeydown="if(event.key==='Enter')addPref('dislike')">
+      <button class="btn small" onclick="addPref('dislike')">Add</button>
+    </div>
+  </div>
+
+  <label>Notes <span style="font-weight:400;font-style:italic;color:var(--ink-soft)">kids, accessibility, anything else</span></label>
+  <textarea id="pref-notes" rows="2" placeholder="e.g. 4 young kids (ages 2–8), need child-friendly activities, prefer not too much walking"
+    onchange="savePrefNotes()"></textarea>
+
+  <div class="modal-actions" style="margin-top:14px">
+    <button class="btn ghost" onclick="closeAll()">Close</button>
+    <button class="btn" onclick="generatePlan()">✦ Generate plan</button>
+  </div>
+
+  <div id="plan-ai-out" class="ai-out" style="margin-top:16px;display:none"></div>
 </div></div>
 
 <!-- Capture modal -->
