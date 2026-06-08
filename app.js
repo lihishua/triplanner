@@ -281,7 +281,8 @@ async function parseLink(url) {
     const country = data?.country;
 
     if (!place && !country) {
-      statusEl.textContent = '⚠ couldn\'t detect — type it below';
+      statusEl.textContent = '⚠ type place below';
+      document.getElementById('cap-place').focus();
       setTimeout(() => { statusEl.textContent = ''; }, 3000);
       return;
     }
