@@ -315,26 +315,42 @@ async function autoDetectCountry(place) {
       + encodeURIComponent(place) + '&addressdetails=1');
     const results = await r.json();
     document.getElementById('cap-country-status').textContent = '';
+    if (!results.length) return;
 
-    const seen = new Set();
-    const options = results
-      .map(r => r.address?.country)
-      .filter(c => c && !seen.has(c) && seen.add(c));
+    // Show place name suggestions (helps with spelling)
+    const placeSuggestions = results.slice(0, 4).map(res => {
+      const name    = res.name || res.display_name.split(',')[0];
+      const country = res.address?.country || '';
+      const state   = res.address?.state || res.address?.county || '';
+      const label   = [name, state, country].filter(Boolean).join(', ');
+      return { name, country, label };
+    });
 
-    if (!options.length) return;
+    const seenCountries = new Set();
+    const countries = results.map(r => r.address?.country).filter(c => c && !seenCountries.has(c) && seenCountries.add(c));
 
-    if (options.length === 1) {
-      document.getElementById('cap-country').value = options[0];
-      document.getElementById('cap-country-suggestions').innerHTML = '';
-    } else {
-      document.getElementById('cap-country-suggestions').innerHTML =
-        options.map(c =>
-          `<button class="suggestion-chip" onclick="pickCountry('${esc(c)}')">${FLAGS[c.toLowerCase()]||'🌍'} ${esc(c)}</button>`
-        ).join('');
+    // If only 1 country, auto-fill country; show place suggestions
+    if (countries.length === 1) {
+      document.getElementById('cap-country').value = countries[0];
     }
+
+    // Show place suggestions as clickable chips
+    document.getElementById('cap-country-suggestions').innerHTML =
+      placeSuggestions.map(p =>
+        `<button class="suggestion-chip" onclick="pickPlace('${esc(p.name)}','${esc(p.country)}')">${FLAGS[p.country.toLowerCase()]||'🌍'} ${esc(p.label)}</button>`
+      ).join('') +
+      (countries.length > 1
+        ? countries.map(c => `<button class="suggestion-chip" onclick="pickCountry('${esc(c)}')">${FLAGS[c.toLowerCase()]||'🌍'} ${esc(c)}</button>`).join('')
+        : '');
   } catch (e) {
     document.getElementById('cap-country-status').textContent = '';
   }
+}
+
+function pickPlace(name, country) {
+  document.getElementById('cap-place').value = name;
+  if (country) document.getElementById('cap-country').value = country;
+  document.getElementById('cap-country-suggestions').innerHTML = '';
 }
 
 function pickCountry(name) {
@@ -634,6 +650,14 @@ async function deletePlace(placeId, countryId) {
   openCountry(countryId);
 }
 
+async function savePlaceNotes(placeId, notes) {
+  const place = places.find(p => p.id === placeId);
+  if (!place) return;
+  place.notes = notes;
+  if (GUEST_MODE) { lsUpdate('places', placeId, { notes }); return; }
+  await sb.from('places').update({ notes }).eq('id', placeId);
+}
+
 async function openCity(id) {
   const c = places.find(x => x.id === id); if (!c) return;
   const country = countries.find(co => co.id === c.country_id);
@@ -642,6 +666,12 @@ async function openCity(id) {
   body.innerHTML = `
     <div id="wx" class="wx">Loading weather…</div>
     ${c.source_url ? `<a class="srclink" href="${esc(c.source_url)}" target="_blank">↗ open saved link</a>` : ''}
+    <div style="margin:12px 0">
+      <textarea id="place-notes-input" rows="2"
+        placeholder="Add notes — what it is, why you want to go, tips…"
+        style="font-family:'Newsreader',serif;font-size:15px;resize:vertical"
+        onchange="savePlaceNotes('${c.id}', this.value)">${c.notes ? esc(c.notes) : ''}</textarea>
+    </div>
     <div class="ai-block">
       <div class="ai-head">
         <span>What to do here</span>
