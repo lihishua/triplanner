@@ -44,6 +44,8 @@ Deno.serve(async (req) => {
       pageText = url;
     }
 
+    // Always include the URL itself — slug/path often contains location ("hoi-an-vietnam")
+    pageText = [pageText, url].filter(Boolean).join("\n");
     if (!pageText) return json({ place: null, country: null });
 
     // Ask Claude to identify the travel destination

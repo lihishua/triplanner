@@ -272,24 +272,31 @@ function onUrlInput() {
 
 async function parseLink(url) {
   const statusEl = document.getElementById('cap-url-status');
-  if (GUEST_MODE) { statusEl.textContent = '(sign in to auto-extract)'; return; }
+  if (GUEST_MODE) { statusEl.textContent = ''; return; }
   try {
     const { data, error } = await sb.functions.invoke('parse-link', { body: { url } });
-    statusEl.textContent = '';
-    if (error || (!data?.place && !data?.country)) return;
-    if (data.place && !document.getElementById('cap-place').value.trim()) {
-      document.getElementById('cap-place').value = data.place;
+    if (error) { statusEl.textContent = '⚠ type place manually'; return; }
+
+    const place   = data?.place;
+    const country = data?.country;
+
+    if (!place && !country) {
+      statusEl.textContent = '⚠ couldn\'t detect — type it below';
+      setTimeout(() => { statusEl.textContent = ''; }, 3000);
+      return;
     }
-    if (data.country && !document.getElementById('cap-country').value.trim()) {
-      document.getElementById('cap-country').value = data.country;
+
+    if (place && !document.getElementById('cap-place').value.trim())
+      document.getElementById('cap-place').value = place;
+    if (country && !document.getElementById('cap-country').value.trim()) {
+      document.getElementById('cap-country').value = country;
       document.getElementById('cap-country-suggestions').innerHTML = '';
     }
-    if (data.place || data.country) {
-      statusEl.textContent = '✓ extracted';
-      setTimeout(() => { statusEl.textContent = ''; }, 2000);
-    }
+    statusEl.textContent = '✓ extracted';
+    setTimeout(() => { statusEl.textContent = ''; }, 2500);
   } catch (e) {
-    statusEl.textContent = '';
+    statusEl.textContent = '⚠ type place manually';
+    setTimeout(() => { statusEl.textContent = ''; }, 3000);
   }
 }
 
