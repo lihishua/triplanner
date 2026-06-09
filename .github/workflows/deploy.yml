@@ -22,7 +22,7 @@ jobs:
       - name: Generate config.js from secrets
         run: |
           cat > config.js << 'ENDOFFILE'
-          window.TRIPLANNER_CONFIG = {
+          window.TRIPLAN_CONFIG = {
             SUPABASE_URL: "SUPABASE_URL_PLACEHOLDER",
             SUPABASE_ANON_KEY: "SUPABASE_ANON_KEY_PLACEHOLDER",
             MAPBOX_TOKEN: "MAPBOX_TOKEN_PLACEHOLDER",
