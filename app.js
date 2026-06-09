@@ -1665,16 +1665,29 @@ function renderTodos() {
       <div class="todo-check${t.done ? ' done' : ''}" onclick="toggleTodo('${t.id}')">
         ${t.done ? '✓' : ''}
       </div>
-      <span class="todo-title${t.done ? ' done' : ''}">${esc(t.title)}</span>
-      ${deadlineLabel ? `<span class="todo-deadline${overdue ? ' overdue' : ''}">${overdue ? '⚠ ' : ''}${deadlineLabel}</span>` : ''}
+      <span class="todo-title${t.done ? ' done' : ''}" onclick="openEditTodo('${t.id}')">${esc(t.title)}</span>
+      ${deadlineLabel ? `<span class="todo-deadline${overdue ? ' overdue' : ''}" onclick="openEditTodo('${t.id}')">${overdue ? '⚠ ' : ''}${deadlineLabel}</span>` : ''}
       <button class="del" style="position:static;opacity:.3;font-size:16px" onclick="deleteTodo('${t.id}')">×</button>
     </div>`;
   }).join('');
 }
 
+let _editingTodoId = null;
+
 function openAddTodo() {
+  _editingTodoId = null;
+  document.querySelector('#ov-todo h3').textContent = 'Add task';
   document.getElementById('todo-title').value = '';
   document.getElementById('todo-deadline').value = '';
+  openOverlay('ov-todo');
+}
+
+function openEditTodo(id) {
+  const t = todos.find(x => x.id === id); if (!t) return;
+  _editingTodoId = id;
+  document.querySelector('#ov-todo h3').textContent = 'Edit task';
+  document.getElementById('todo-title').value = t.title;
+  document.getElementById('todo-deadline').value = t.deadline || '';
   openOverlay('ov-todo');
 }
 
@@ -1682,12 +1695,21 @@ async function saveTodo() {
   const title = document.getElementById('todo-title').value.trim();
   if (!title) return;
   const deadline = document.getElementById('todo-deadline').value || null;
-  const row = { trip_id: TRIP_ID, title, deadline, done: false };
-  if (GUEST_MODE) { lsInsert('todos', row); }
-  else { await sb.from('trip_todos').insert(row); }
+
+  if (_editingTodoId) {
+    const t = todos.find(x => x.id === _editingTodoId);
+    if (t) { t.title = title; t.deadline = deadline; }
+    if (GUEST_MODE) { lsUpdate('todos', _editingTodoId, { title, deadline }); }
+    else { await sb.from('trip_todos').update({ title, deadline }).eq('id', _editingTodoId); }
+  } else {
+    const row = { trip_id: TRIP_ID, title, deadline, done: false };
+    if (GUEST_MODE) { lsInsert('todos', row); }
+    else { await sb.from('trip_todos').insert(row); }
+    logActivity('added_todo', title, 'todo');
+  }
+  _editingTodoId = null;
   closeAll();
   await refreshTodos();
-  logActivity('added_todo', title, 'todo');
 }
 
 async function toggleTodo(id) {
@@ -1705,47 +1727,78 @@ async function deleteTodo(id) {
   renderTodos();
 }
 
+// Track suggested/skipped todos so AI doesn't repeat them
+function getSeenTodoTitles() {
+  const key = 'triplan_seen_todos_' + TRIP_ID;
+  try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; }
+}
+function addSeenTodoTitle(title) {
+  const key = 'triplan_seen_todos_' + TRIP_ID;
+  const seen = getSeenTodoTitles();
+  if (!seen.includes(title)) { seen.push(title); localStorage.setItem(key, JSON.stringify(seen)); }
+}
+
 async function suggestTodos() {
   const el = document.getElementById('todoList');
   el.innerHTML = '<div style="color:var(--ink-soft);font-style:italic;padding:20px 0">AI is thinking of what you need to prepare…</div>';
-  const tripContext = { countries: countries.map(c => ({ name: c.name })) };
+
+  const existingTitles = [
+    ...todos.map(t => t.title),
+    ...getSeenTodoTitles(),
+  ];
+  const tripContext = { countries: countries.map(c => ({ name: c.name })), existingTodos: existingTitles };
+
   try {
     const { data, error } = await sb.functions.invoke('chat-plan', {
       body: { messages: [{ role: 'user', content: 'Suggest pre-trip todos for my family trip.' }],
               tripContext, preferences: tripPreferences, mode: 'todo' },
     });
     if (error || !data?.todos?.length) { await refreshTodos(); return; }
-    const aiTodos = data.todos || [];
-    el.innerHTML = (data.reply ? `<div style="color:var(--ink-soft);font-size:14px;margin-bottom:14px">${esc(data.reply)}</div>` : '') +
-      aiTodos.map((t, i) => `
-        <div class="todo-ai-card">
-          <div class="todo-ai-title">${esc(t.title)}</div>
-          ${t.deadline ? `<div style="font-size:12px;color:var(--ink-soft)">By ${esc(t.deadline)}</div>` : ''}
-          ${t.reason ? `<div class="todo-ai-reason">${esc(t.reason)}</div>` : ''}
-          <div class="todo-ai-actions">
-            <button class="btn small" onclick="acceptAiTodo(${i})">✓ Add</button>
-            <button class="btn ghost small" onclick="this.closest('.todo-ai-card').remove()">✗ Skip</button>
-          </div>
-        </div>`).join('') +
-      `<div id="todo-existing"></div>`;
+    window._aiTodos = data.todos;
 
-    window._aiTodos = aiTodos;
-    // Render existing todos below
-    const existingEl = document.getElementById('todo-existing');
-    if (existingEl && todos.length) {
-      existingEl.innerHTML = '<div style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">' +
-        todos.map(t => `<div style="padding:8px 0;font-size:14px;color:var(--ink-soft)">${t.done ? '✓ ' : ''}${esc(t.title)}</div>`).join('') + '</div>';
-    }
+    // Pre-mark all as seen so next call skips them
+    data.todos.forEach(t => addSeenTodoTitle(t.title));
+
+    renderAiTodos(data.reply, data.todos);
   } catch (e) { await refreshTodos(); }
 }
 
-async function acceptAiTodo(idx) {
+function renderAiTodos(reply, aiTodos) {
+  const el = document.getElementById('todoList');
+  el.innerHTML =
+    (reply ? `<div style="color:var(--ink-soft);font-size:14px;margin-bottom:14px">${esc(reply)}</div>` : '') +
+    `<div id="ai-todo-cards">` +
+    aiTodos.map((t, i) => `
+      <div class="todo-ai-card" id="ai-todo-${i}">
+        <div class="todo-ai-title">${esc(t.title)}</div>
+        ${t.deadline ? `<div style="font-size:12px;color:var(--ink-soft);margin-bottom:2px">By ${esc(t.deadline)}</div>` : ''}
+        ${t.reason ? `<div class="todo-ai-reason">${esc(t.reason)}</div>` : ''}
+        <div class="todo-ai-actions">
+          <button class="btn small" onclick="acceptAiTodo(${i}, this)">✓ Add</button>
+          <button class="btn ghost small" onclick="skipAiTodo(${i}, this)">✗ Skip</button>
+        </div>
+      </div>`).join('') +
+    `</div>` +
+    `<div style="margin-top:16px;text-align:right"><button class="btn ghost small" onclick="refreshTodos();renderTodos()">View my list →</button></div>`;
+}
+
+async function acceptAiTodo(idx, btn) {
   const t = window._aiTodos?.[idx]; if (!t) return;
   const row = { trip_id: TRIP_ID, title: t.title, deadline: t.deadline || null, done: false };
   if (GUEST_MODE) lsInsert('todos', row);
   else await sb.from('trip_todos').insert(row);
-  await refreshTodos();
-  showTab('prep');
+  todos.push({ ...row, id: Date.now().toString(36) });
+  // Update card in place — show "✓ Added", disable buttons
+  btn.textContent = '✓ Added';
+  btn.disabled = true;
+  btn.nextElementSibling?.remove(); // remove Skip button
+}
+
+async function skipAiTodo(idx, btn) {
+  addSeenTodoTitle(window._aiTodos?.[idx]?.title || '');
+  const card = document.getElementById('ai-todo-' + idx);
+  if (card) { card.style.opacity = '0.4'; card.style.pointerEvents = 'none'; }
+  btn.closest('.todo-ai-actions').innerHTML = '<span style="color:var(--ink-soft);font-size:13px">Skipped</span>';
 }
 
 /* ================================================================

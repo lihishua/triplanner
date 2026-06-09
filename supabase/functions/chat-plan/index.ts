@@ -84,18 +84,19 @@ function buildTodoSystemPrompt(ctx: any, prefs: any) {
   const destList = (ctx?.countries || []).map((c: any) => c.name).join(", ");
   const prefText = prefs?.notes || "";
 
+  const alreadySeen = (ctx?.existingTodos || []).slice(0, 30).join(", ");
   return `You are helping a family prepare for a trip to: ${destList || "various destinations"}.
 ${prefText ? `Family notes: ${prefText}` : ""}
+${alreadySeen ? `Already suggested or added (do NOT repeat these): ${alreadySeen}` : ""}
 
-Suggest practical pre-trip todos. Return JSON:
+Suggest 4-6 NEW practical pre-trip todos not already in the list above. Return JSON:
 {
   "reply": "brief intro sentence",
   "todos": [
     {"title": "What to do", "deadline": "YYYY-MM-DD or null", "reason": "one short reason"}
   ]
 }
-Suggest 4-6 practical items. Deadlines should be realistic (2-4 weeks before departure).
-Return ONLY valid JSON.`;
+Deadlines should be realistic (2-8 weeks before departure). Return ONLY valid JSON.`;
 }
 
 function json(body: unknown, status = 200) {
