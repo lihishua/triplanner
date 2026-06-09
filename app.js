@@ -1795,7 +1795,7 @@ async function loadActivityBanner() {
   let html = '';
   for (const [who, acts] of Object.entries(byAuthor)) {
     html += `<div style="margin-bottom:6px"><span style="font-family:'Fraunces',serif;font-weight:600">${esc(who)}'s updates:</span> `;
-    html += (acts as any[]).map(a =>
+    html += acts.map(a =>
       `<span class="activity-item" onclick="navigateToActivity('${a.entity_type}')">
         ${a.action === 'added_flight' ? '✈' : a.action === 'added_todo' ? '✓' : '📍'} ${esc(a.summary)}
       </span>`
