@@ -155,6 +155,45 @@
     border:1px solid var(--line);border-radius:10px}
   .add-place-row input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 
+  /* TODO LIST */
+  .todo-item{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}
+  .todo-check{width:20px;height:20px;border-radius:6px;border:2px solid var(--accent);
+    cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:#fff}
+  .todo-check.done{background:var(--accent);border-color:var(--accent);color:#fff}
+  .todo-title{flex:1;font-size:15px;cursor:pointer}
+  .todo-title.done{text-decoration:line-through;color:var(--ink-soft)}
+  .todo-deadline{font-size:12px;color:var(--ink-soft);font-style:italic;flex-shrink:0}
+  .todo-deadline.overdue{color:#b4544a}
+  .todo-ai-card{background:var(--accent-soft);border:1px solid var(--line);border-radius:12px;
+    padding:12px 14px;margin-bottom:8px}
+  .todo-ai-title{font-size:15px;font-weight:500;margin-bottom:2px}
+  .todo-ai-reason{font-size:13px;color:var(--ink-soft);margin-bottom:8px}
+  .todo-ai-actions{display:flex;gap:8px}
+
+  /* CHAT */
+  .chat-messages{display:flex;flex-direction:column;gap:14px;margin-bottom:16px;
+    min-height:100px;max-height:60vh;overflow-y:auto;padding-right:4px}
+  .chat-msg{max-width:88%;border-radius:16px;padding:12px 16px;font-size:15px;line-height:1.55}
+  .chat-msg.user{background:var(--accent);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+  .chat-msg.assistant{background:var(--paper);border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:4px}
+  .chat-input-row{display:flex;gap:10px;align-items:flex-end;position:sticky;bottom:0;
+    background:var(--bg);padding:12px 0 4px}
+  .chat-input-row textarea{flex:1;resize:none;font-size:15px;border-radius:12px;padding:10px 14px;
+    border:1px solid var(--line);font-family:'Newsreader',serif}
+  .chat-sugg-cards{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+  .sugg-card{background:var(--paper);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .sugg-card-img{width:100%;height:120px;object-fit:cover;display:block;background:var(--accent-soft)}
+  .sugg-card-body{padding:10px 12px}
+  .sugg-card-name{font-family:'Fraunces',serif;font-weight:600;font-size:16px;margin-bottom:3px}
+  .sugg-card-desc{font-size:13px;color:var(--ink-soft);margin-bottom:8px}
+  .sugg-card-actions{display:flex;gap:8px;flex-wrap:wrap}
+
+  /* ACTIVITY BANNER */
+  .activity-item{display:inline-flex;align-items:center;gap:6px;cursor:pointer;
+    background:var(--paper);border:1px solid var(--line);border-radius:20px;
+    padding:4px 12px;font-size:13px;margin:3px 4px 3px 0}
+  .activity-item:hover{border-color:var(--accent);color:var(--accent)}
+
   /* TRAVEL PREFERENCES */
   .pref-group{margin:12px 0 16px}
   .pref-label{font-family:'Fraunces',serif;font-weight:600;font-size:14px;margin-bottom:8px}
@@ -323,10 +362,16 @@
       </div>
     </header>
     <div id="trip-carousel" class="trip-carousel" style="display:none"></div>
+    <!-- Activity banner -->
+    <div id="activity-banner" style="display:none;background:var(--accent-soft);border:1px solid var(--line);
+      border-radius:12px;padding:12px 16px;margin-top:12px;font-size:14px"></div>
+
     <nav class="tabs">
       <button class="active" data-tab="countries" onclick="showTab('countries')">Countries</button>
       <button data-tab="flights" onclick="showTab('flights')">Flights</button>
       <button data-tab="budget" onclick="showTab('budget')">Budget</button>
+      <button data-tab="prep" onclick="showTab('prep')">Prep</button>
+      <button data-tab="chat" onclick="showTab('chat')">✦ Chat</button>
     </nav>
 
     <section class="page active" id="page-countries">
@@ -365,10 +410,49 @@
       <div class="grid flights" id="expenseList" style="margin-top:18px"></div>
     </section>
 
+    <!-- PREP TAB -->
+    <section class="page" id="page-prep">
+      <div class="page-head">
+        <div><h2>Prep</h2><p>Things to do before you go.</p></div>
+        <div style="display:flex;gap:10px">
+          <button class="btn ghost" onclick="suggestTodos()">✦ AI suggest</button>
+          <button class="btn" onclick="openAddTodo()">＋ Add task</button>
+        </div>
+      </div>
+      <div id="todoList"></div>
+    </section>
+
+    <!-- CHAT TAB -->
+    <section class="page" id="page-chat">
+      <div class="page-head">
+        <div><h2>Plan with AI</h2><p>Ask anything about your trip.</p></div>
+        <button class="btn ghost small" onclick="clearChat()">Clear history</button>
+      </div>
+      <div id="chatMessages" class="chat-messages"></div>
+      <div class="chat-input-row">
+        <textarea id="chat-input" rows="2" placeholder="Find me a kid-friendly beach in Sri Lanka… or: What should we do first in Goa?"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea>
+        <button class="btn" onclick="sendChat()">Send</button>
+      </div>
+    </section>
+
     <footer>Shared between both of you · saved to your Supabase project.</footer>
   </div>
   <button class="fab" onclick="openCapture()">＋</button>
 </div>
+
+<!-- Add Todo modal -->
+<div class="overlay" id="ov-todo"><div class="modal">
+  <h3>Add task</h3>
+  <label>Task</label>
+  <input id="todo-title" placeholder="e.g. Book pet sitter, Get travel insurance">
+  <label>Deadline (optional)</label>
+  <input id="todo-deadline" type="date">
+  <div class="modal-actions">
+    <button class="btn ghost" onclick="closeAll()">Cancel</button>
+    <button class="btn" onclick="saveTodo()">Add</button>
+  </div>
+</div></div>
 
 <!-- AI Plan modal -->
 <div class="overlay" id="ov-plan"><div class="modal">

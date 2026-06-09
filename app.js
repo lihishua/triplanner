@@ -125,6 +125,7 @@ async function enterTrip(trip) {
   renderTripCarousel();
   await refreshAll();
   await loadPreferences();
+  loadActivityBanner();
 }
 
 function renderTripCarousel() {
@@ -393,6 +394,7 @@ async function runCapture() {
   });
   if (error) return capMsg(error.message);
   closeAll(); await refreshAll();
+  logActivity('added_place', cap(cityName) + ', ' + cap(countryName), 'place');
 }
 
 /* ---------------- RENDER: COUNTRIES ---------------- */
@@ -805,6 +807,9 @@ async function saveFlight() {
   }
   _editingFlightId = null;
   closeAll(); await refreshAll();
+  if (!_editingFlightId) logActivity('added_flight',
+    `${f.origin || '?'} → ${f.destination || '?'}${f.depart_date ? ' · ' + f.depart_date : ''}${f.airline ? ' · ' + f.airline : ''}`,
+    'flight');
 }
 
 async function delFlight(id){
@@ -1470,6 +1475,367 @@ function showPreviewCard(flight, index, total, summary = false) {
 
 function hidePreviewCard() {
   document.getElementById('preview-card').classList.remove('show');
+}
+
+/* ================================================================
+   FEATURE 1: PLANNING CHAT
+   ================================================================ */
+let chatHistory = [];
+let chatLoaded  = false;
+
+async function loadChat() {
+  if (chatLoaded || GUEST_MODE) return;
+  const { data } = await sb.from('trip_chat').select('*')
+    .eq('trip_id', TRIP_ID).order('created_at');
+  chatHistory = data || [];
+  chatLoaded = true;
+  renderChat();
+}
+
+function renderChat() {
+  const el = document.getElementById('chatMessages');
+  if (!el) return;
+  if (!chatHistory.length) {
+    el.innerHTML = '<div style="color:var(--ink-soft);font-style:italic;font-size:14px;padding:20px 0">Ask me anything about your trip — places to visit, what to do with kids, how to split your time…</div>';
+    return;
+  }
+  el.innerHTML = chatHistory.map(m => {
+    let html = `<div class="chat-msg ${m.role}">`;
+    html += `<div>${esc(m.content)}</div>`;
+    if (m.role === 'assistant' && m.suggestions?.length) {
+      html += `<div class="chat-sugg-cards">`;
+      m.suggestions.forEach((s, i) => {
+        const mid = `${m.id}_${i}`;
+        html += renderSuggCard(s, mid);
+      });
+      html += `</div>`;
+    }
+    html += `</div>`;
+    return html;
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function renderSuggCard(s, mid) {
+  const mapsUrl = `https://www.google.com/maps/search/?q=${encodeURIComponent(s.name + (s.country ? ' ' + s.country : ''))}`;
+  const wikiImg = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(s.name)}`;
+  const confirmed = s.confirmed;
+  return `<div class="sugg-card" id="sugg-${mid}">
+    <img class="sugg-card-img" src="" alt="${esc(s.name)}"
+      onerror="this.style.display='none'"
+      onload="this.style.display='block'"
+      data-wiki="${esc(wikiImg)}"
+      style="display:none">
+    <div class="sugg-card-body">
+      <div class="sugg-card-name">${esc(s.name)}${s.country ? `<span style="color:var(--ink-soft);font-weight:400;font-size:13px"> · ${esc(s.country)}</span>` : ''}</div>
+      <div class="sugg-card-desc">${esc(s.description || '')}</div>
+      <div class="sugg-card-actions">
+        <a href="${mapsUrl}" target="_blank" class="btn ghost small">🔍 Google Maps</a>
+        ${confirmed
+          ? `<button class="btn small ghost" disabled style="color:var(--accent)">✓ Added</button>`
+          : `<button class="btn small" onclick="confirmSuggestion('${mid}')">✓ Add to trip</button>`}
+      </div>
+    </div>
+  </div>`;
+}
+
+// Lazy-load Wikipedia photos
+function loadWikiPhotos() {
+  document.querySelectorAll('[data-wiki]').forEach(async img => {
+    if (img.dataset.loaded) return;
+    img.dataset.loaded = '1';
+    try {
+      const r = await fetch(img.dataset.wiki);
+      const d = await r.json();
+      if (d.thumbnail?.source) { img.src = d.thumbnail.source; }
+    } catch (_) {}
+  });
+}
+
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+
+  const userMsg = { role: 'user', content: text };
+  chatHistory.push(userMsg);
+  renderChat();
+
+  // Thinking indicator
+  const el = document.getElementById('chatMessages');
+  el.innerHTML += `<div class="chat-msg assistant" id="chat-thinking"><em style="color:var(--ink-soft)">Thinking…</em></div>`;
+  el.scrollTop = el.scrollHeight;
+
+  const tripContext = {
+    countries: countries.map(c => ({ name: c.name, planned_days: c.planned_days })),
+    flights: flights.map(f => ({ from: f.origin, to: f.destination, date: f.depart_date })),
+  };
+
+  const messages = chatHistory.slice(-12).map(m => ({ role: m.role, content: m.content }));
+
+  try {
+    const { data, error } = await sb.functions.invoke('chat-plan', {
+      body: { messages, tripContext, preferences: tripPreferences, mode: 'chat' },
+    });
+
+    document.getElementById('chat-thinking')?.remove();
+
+    if (error || !data) {
+      chatHistory.push({ role: 'assistant', content: error?.message || 'Could not reach AI.', suggestions: [] });
+    } else {
+      const assistantMsg = {
+        role: 'assistant',
+        content: data.reply || '',
+        suggestions: data.suggestions || [],
+        _tempId: Date.now(),
+      };
+      chatHistory.push(assistantMsg);
+
+      // Save to DB
+      if (!GUEST_MODE) {
+        const saves = [
+          sb.from('trip_chat').insert({ trip_id: TRIP_ID, role: 'user', content: text }),
+          sb.from('trip_chat').insert({ trip_id: TRIP_ID, role: 'assistant', content: data.reply, suggestions: data.suggestions || [] }),
+        ];
+        const [, { data: saved }] = await Promise.all(saves);
+        if (saved?.[0]?.id) assistantMsg.id = saved[0].id;
+      }
+    }
+    renderChat();
+    setTimeout(loadWikiPhotos, 300);
+  } catch (e) {
+    document.getElementById('chat-thinking')?.remove();
+    chatHistory.push({ role: 'assistant', content: 'Error: ' + String(e), suggestions: [] });
+    renderChat();
+  }
+}
+
+async function confirmSuggestion(mid) {
+  // mid = "{messageId}_{suggIndex}"
+  const [msgId, idxStr] = mid.split('_');
+  const idx = parseInt(idxStr);
+  const msg = chatHistory.find(m => m.id === msgId || m._tempId === parseInt(msgId));
+  if (!msg?.suggestions?.[idx]) return;
+  const s = msg.suggestions[idx];
+  await ensureCountry(cap(s.country || s.name), FLAGS[(s.country || s.name).toLowerCase()] || '🌍');
+  s.confirmed = true;
+  if (!GUEST_MODE && msg.id) {
+    await sb.from('trip_chat').update({ suggestions: msg.suggestions }).eq('id', msg.id);
+  }
+  await refreshAll();
+  renderChat();
+  logActivity('confirmed_suggestion', `✓ ${s.name}${s.country ? ', ' + s.country : ''}`, 'place');
+}
+
+async function clearChat() {
+  if (!confirm('Clear all chat history?')) return;
+  chatHistory = [];
+  chatLoaded = false;
+  if (!GUEST_MODE) await sb.from('trip_chat').delete().eq('trip_id', TRIP_ID);
+  renderChat();
+}
+
+/* ================================================================
+   FEATURE 2: PRE-TRIP TODO LIST
+   ================================================================ */
+let todos = [];
+
+async function refreshTodos() {
+  if (GUEST_MODE) { todos = lsGet('todos').filter(r => r.trip_id === TRIP_ID); renderTodos(); return; }
+  const { data } = await sb.from('trip_todos').select('*').eq('trip_id', TRIP_ID).order('deadline').order('created_at');
+  todos = data || [];
+  renderTodos();
+}
+
+function renderTodos() {
+  const el = document.getElementById('todoList');
+  if (!el) return;
+  if (!todos.length) {
+    el.innerHTML = '<div class="empty">No tasks yet. Add things you need to do before the trip, or ask AI to suggest some.</div>';
+    return;
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  el.innerHTML = todos.map(t => {
+    const overdue = t.deadline && !t.done && t.deadline < today;
+    const deadlineLabel = t.deadline
+      ? new Date(t.deadline + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+      : '';
+    return `<div class="todo-item">
+      <div class="todo-check${t.done ? ' done' : ''}" onclick="toggleTodo('${t.id}')">
+        ${t.done ? '✓' : ''}
+      </div>
+      <span class="todo-title${t.done ? ' done' : ''}">${esc(t.title)}</span>
+      ${deadlineLabel ? `<span class="todo-deadline${overdue ? ' overdue' : ''}">${overdue ? '⚠ ' : ''}${deadlineLabel}</span>` : ''}
+      <button class="del" style="position:static;opacity:.3;font-size:16px" onclick="deleteTodo('${t.id}')">×</button>
+    </div>`;
+  }).join('');
+}
+
+function openAddTodo() {
+  document.getElementById('todo-title').value = '';
+  document.getElementById('todo-deadline').value = '';
+  openOverlay('ov-todo');
+}
+
+async function saveTodo() {
+  const title = document.getElementById('todo-title').value.trim();
+  if (!title) return;
+  const deadline = document.getElementById('todo-deadline').value || null;
+  const row = { trip_id: TRIP_ID, title, deadline, done: false };
+  if (GUEST_MODE) { lsInsert('todos', row); }
+  else { await sb.from('trip_todos').insert(row); }
+  closeAll();
+  await refreshTodos();
+  logActivity('added_todo', title, 'todo');
+}
+
+async function toggleTodo(id) {
+  const t = todos.find(x => x.id === id); if (!t) return;
+  t.done = !t.done;
+  if (GUEST_MODE) { lsUpdate('todos', id, { done: t.done }); }
+  else { await sb.from('trip_todos').update({ done: t.done }).eq('id', id); }
+  renderTodos();
+}
+
+async function deleteTodo(id) {
+  todos = todos.filter(t => t.id !== id);
+  if (GUEST_MODE) { lsDelete('todos', id); }
+  else { await sb.from('trip_todos').delete().eq('id', id); }
+  renderTodos();
+}
+
+async function suggestTodos() {
+  const el = document.getElementById('todoList');
+  el.innerHTML = '<div style="color:var(--ink-soft);font-style:italic;padding:20px 0">AI is thinking of what you need to prepare…</div>';
+  const tripContext = { countries: countries.map(c => ({ name: c.name })) };
+  try {
+    const { data, error } = await sb.functions.invoke('chat-plan', {
+      body: { messages: [{ role: 'user', content: 'Suggest pre-trip todos for my family trip.' }],
+              tripContext, preferences: tripPreferences, mode: 'todo' },
+    });
+    if (error || !data?.todos?.length) { await refreshTodos(); return; }
+    const aiTodos = data.todos || [];
+    el.innerHTML = (data.reply ? `<div style="color:var(--ink-soft);font-size:14px;margin-bottom:14px">${esc(data.reply)}</div>` : '') +
+      aiTodos.map((t, i) => `
+        <div class="todo-ai-card">
+          <div class="todo-ai-title">${esc(t.title)}</div>
+          ${t.deadline ? `<div style="font-size:12px;color:var(--ink-soft)">By ${esc(t.deadline)}</div>` : ''}
+          ${t.reason ? `<div class="todo-ai-reason">${esc(t.reason)}</div>` : ''}
+          <div class="todo-ai-actions">
+            <button class="btn small" onclick="acceptAiTodo(${i})">✓ Add</button>
+            <button class="btn ghost small" onclick="this.closest('.todo-ai-card').remove()">✗ Skip</button>
+          </div>
+        </div>`).join('') +
+      `<div id="todo-existing"></div>`;
+
+    window._aiTodos = aiTodos;
+    // Render existing todos below
+    const existingEl = document.getElementById('todo-existing');
+    if (existingEl && todos.length) {
+      existingEl.innerHTML = '<div style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">' +
+        todos.map(t => `<div style="padding:8px 0;font-size:14px;color:var(--ink-soft)">${t.done ? '✓ ' : ''}${esc(t.title)}</div>`).join('') + '</div>';
+    }
+  } catch (e) { await refreshTodos(); }
+}
+
+async function acceptAiTodo(idx) {
+  const t = window._aiTodos?.[idx]; if (!t) return;
+  const row = { trip_id: TRIP_ID, title: t.title, deadline: t.deadline || null, done: false };
+  if (GUEST_MODE) lsInsert('todos', row);
+  else await sb.from('trip_todos').insert(row);
+  await refreshTodos();
+  showTab('prep');
+}
+
+/* ================================================================
+   FEATURE 3: ACTIVITY FEED
+   ================================================================ */
+async function logActivity(action, summary, entityType = null, entityId = null) {
+  if (GUEST_MODE || !TRIP_ID) return;
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return;
+  await sb.from('trip_activity').insert({
+    trip_id: TRIP_ID,
+    user_email: user.email,
+    action,
+    summary,
+    entity_type: entityType,
+    entity_id: entityId ? String(entityId) : null,
+    seen_by: [user.id],
+  }).catch(() => {});
+}
+
+async function loadActivityBanner() {
+  if (GUEST_MODE) return;
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return;
+  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data } = await sb.from('trip_activity').select('*')
+    .eq('trip_id', TRIP_ID)
+    .gt('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(20);
+  if (!data?.length) return;
+
+  const unseen = data.filter(a => !a.seen_by?.includes(user.id));
+  if (!unseen.length) return;
+
+  // Group by author
+  const byAuthor = {};
+  unseen.forEach(a => {
+    const who = a.user_email === user.email ? null : (a.user_email?.split('@')[0] || 'Someone');
+    if (!who) return;
+    if (!byAuthor[who]) byAuthor[who] = [];
+    byAuthor[who].push(a);
+  });
+  if (!Object.keys(byAuthor).length) return;
+
+  const banner = document.getElementById('activity-banner');
+  let html = '';
+  for (const [who, acts] of Object.entries(byAuthor)) {
+    html += `<div style="margin-bottom:6px"><span style="font-family:'Fraunces',serif;font-weight:600">${esc(who)}'s updates:</span> `;
+    html += (acts as any[]).map(a =>
+      `<span class="activity-item" onclick="navigateToActivity('${a.entity_type}')">
+        ${a.action === 'added_flight' ? '✈' : a.action === 'added_todo' ? '✓' : '📍'} ${esc(a.summary)}
+      </span>`
+    ).join('');
+    html += '</div>';
+  }
+  html += `<div style="margin-top:6px;text-align:right"><button class="btn ghost small" onclick="dismissBanner()">Dismiss</button></div>`;
+  banner.innerHTML = html;
+  banner.style.display = 'block';
+
+  // Mark as seen
+  await sb.from('trip_activity').update({
+    seen_by: sb.rpc ? undefined : null,
+  }).in('id', unseen.map(a => a.id)).catch(() => {});
+
+  // Simpler: just mark each one
+  const uid = user.id;
+  for (const a of unseen) {
+    const newSeen = [...(a.seen_by || []), uid];
+    await sb.from('trip_activity').update({ seen_by: newSeen }).eq('id', a.id).catch(() => {});
+  }
+}
+
+function dismissBanner() {
+  document.getElementById('activity-banner').style.display = 'none';
+}
+
+function navigateToActivity(entityType) {
+  const tabMap = { flight: 'flights', place: 'countries', todo: 'prep' };
+  if (tabMap[entityType]) showTab(tabMap[entityType]);
+  dismissBanner();
+}
+
+// Override tab show to load data lazily
+const _origShowTab = showTab;
+function showTab(t) {
+  document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + t));
+  if (t === 'prep') refreshTodos();
+  if (t === 'chat') { loadChat(); setTimeout(loadWikiPhotos, 400); }
 }
 
 init();
