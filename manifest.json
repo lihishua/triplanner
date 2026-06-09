@@ -1,6 +1,6 @@
 {
-  "name": "TriPlanner",
-  "short_name": "TriPlanner",
+  "name": "TriPlan",
+  "short_name": "TriPlan",
   "description": "Plan your trip together",
   "start_url": ".",
   "display": "standalone",

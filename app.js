@@ -1,6 +1,6 @@
-/* app.js — TriPlanner front-end logic */
+/* app.js — TriPlan front-end logic */
 
-const { SUPABASE_URL, SUPABASE_ANON_KEY } = window.TRIPLANNER_CONFIG;
+const { SUPABASE_URL, SUPABASE_ANON_KEY } = window.TRIPLAN_CONFIG;
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let TRIP_ID = null;
@@ -1312,7 +1312,7 @@ async function previewTrip() {
   document.getElementById('ov-preview').classList.add('show');
   document.getElementById('preview-loading').style.display = 'flex';
 
-  const { MAPBOX_TOKEN } = window.TRIPLANNER_CONFIG;
+  const { MAPBOX_TOKEN } = window.TRIPLAN_CONFIG;
   mapboxgl.accessToken = MAPBOX_TOKEN;
 
   if (previewMapInstance) { previewMapInstance.remove(); previewMapInstance = null; }

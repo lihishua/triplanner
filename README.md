@@ -1,4 +1,4 @@
-# TriPlanner
+# TriPlan
 
 Plan your trip together — or solo.
 
