@@ -125,7 +125,7 @@ async function enterTrip(trip) {
   renderTripCarousel();
   await refreshAll();
   await loadPreferences();
-  loadActivityBanner();
+  loadUpdateCenter();
 }
 
 function renderTripCarousel() {
@@ -1828,67 +1828,100 @@ async function logActivity(action, summary, entityType = null, entityId = null, 
   }).catch(() => {});
 }
 
-async function loadActivityBanner() {
+let _currentDigest = null;
+let _unseenRows = [];
+
+async function loadUpdateCenter() {
   if (GUEST_MODE) return;
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return;
-  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const { data } = await sb.from('trip_activity').select('*')
     .eq('trip_id', TRIP_ID)
-    .gt('created_at', since)
-    .order('created_at', { ascending: false })
+    .neq('user_email', user.email)
+    .order('created_at', { ascending: true })
     .limit(20);
-  if (!data?.length) return;
+  _unseenRows = (data || []).filter(a => !a.seen_by?.includes(user.id));
+  _currentDigest = buildUpdateDigest(_unseenRows);
+  renderUpdateCenter();
+  updateBellBadge();
+  if (_unseenRows.length) openOverlay('ov-updates');
+}
 
-  const unseen = data.filter(a => !a.seen_by?.includes(user.id));
-  if (!unseen.length) return;
+function updateBellBadge() {
+  document.getElementById('updates-dot').style.display = _unseenRows.length ? 'block' : 'none';
+}
 
-  // Group by author
-  const byAuthor = {};
-  unseen.forEach(a => {
-    const who = a.user_email === user.email ? null : (a.user_email?.split('@')[0] || 'Someone');
-    if (!who) return;
-    if (!byAuthor[who]) byAuthor[who] = [];
-    byAuthor[who].push(a);
+function renderUpdateCenter() {
+  const sections = [
+    ['Flights', _currentDigest?.flights, 'flights'],
+    ['Countries', _currentDigest?.countries, 'countries'],
+    ['Places', _currentDigest?.places, 'places'],
+    ['Todos', _currentDigest?.todos, 'todos'],
+  ];
+  document.getElementById('updates-body').innerHTML = sections.map(([label, line, key]) => `
+    <div class="update-section">
+      <div class="update-heading">${esc(label)}</div>
+      ${line
+        ? `<div class="update-bullet" onclick="navUpdate('${key}')">${esc(line.text)}</div>`
+        : `<div class="update-empty">No new ${esc(label.toLowerCase())}.</div>`}
+    </div>`).join('');
+}
+
+async function acknowledgeUpdates() {
+  const { data: { user } } = await sb.auth.getUser();
+  if (user) {
+    for (const row of _unseenRows) {
+      const newSeen = [...(row.seen_by || []), user.id];
+      await sb.from('trip_activity').update({ seen_by: newSeen }).eq('id', row.id).catch(() => {});
+    }
+    _unseenRows = [];
+    updateBellBadge();
+  }
+  closeAll();
+}
+
+function navUpdate(key) {
+  const line = _currentDigest?.[key];
+  if (!line) return;
+  closeAll();
+  if (key === 'flights') return navUpdateFlights(line.ids);
+  if (key === 'countries') return navUpdateCountry(line.ids[0]);
+  if (key === 'places') return navUpdatePlace(line.ids[0]);
+  if (key === 'todos') return navUpdateTodos(line.ids);
+}
+
+function navUpdateFlights(ids) {
+  showTab('flights');
+  highlightEls(ids.map(id => `.card[data-id="${id}"]`));
+}
+
+function navUpdateCountry(id) {
+  if (!id) return;
+  openCountry(id);
+}
+
+function navUpdatePlace(id) {
+  if (!id) return;
+  const place = places.find(p => p.id === id);
+  if (!place) return;
+  openCountry(place.country_id);
+  setTimeout(() => highlightEls([`.place-item[data-id="${id}"]`]), 50);
+}
+
+async function navUpdateTodos(ids) {
+  showTab('prep');
+  await refreshTodos();
+  highlightEls(ids.map(id => `.todo-item[data-id="${id}"]`));
+}
+
+function highlightEls(selectors) {
+  const els = selectors.map(s => document.querySelector(s)).filter(Boolean);
+  if (!els.length) return;
+  els[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+  els.forEach(el => {
+    el.classList.add('highlight-pulse');
+    setTimeout(() => el.classList.remove('highlight-pulse'), 2000);
   });
-  if (!Object.keys(byAuthor).length) return;
-
-  const banner = document.getElementById('activity-banner');
-  let html = '';
-  for (const [who, acts] of Object.entries(byAuthor)) {
-    html += `<div style="margin-bottom:6px"><span style="font-family:'Fraunces',serif;font-weight:600">${esc(who)}'s updates:</span> `;
-    html += acts.map(a =>
-      `<span class="activity-item" onclick="navigateToActivity('${a.entity_type}')">
-        ${a.action === 'added_flight' ? '✈' : a.action === 'added_todo' ? '✓' : '📍'} ${esc(a.summary)}
-      </span>`
-    ).join('');
-    html += '</div>';
-  }
-  html += `<div style="margin-top:6px;text-align:right"><button class="btn ghost small" onclick="dismissBanner()">Dismiss</button></div>`;
-  banner.innerHTML = html;
-  banner.style.display = 'block';
-
-  // Mark as seen
-  await sb.from('trip_activity').update({
-    seen_by: sb.rpc ? undefined : null,
-  }).in('id', unseen.map(a => a.id)).catch(() => {});
-
-  // Simpler: just mark each one
-  const uid = user.id;
-  for (const a of unseen) {
-    const newSeen = [...(a.seen_by || []), uid];
-    await sb.from('trip_activity').update({ seen_by: newSeen }).eq('id', a.id).catch(() => {});
-  }
-}
-
-function dismissBanner() {
-  document.getElementById('activity-banner').style.display = 'none';
-}
-
-function navigateToActivity(entityType) {
-  const tabMap = { flight: 'flights', place: 'countries', todo: 'prep' };
-  if (tabMap[entityType]) showTab(tabMap[entityType]);
-  dismissBanner();
 }
 
 // Override tab show to load data lazily
