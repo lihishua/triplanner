@@ -1707,9 +1707,13 @@ async function saveTodo() {
     else { await sb.from('trip_todos').update({ title, deadline }).eq('id', _editingTodoId); }
   } else {
     const row = { trip_id: TRIP_ID, title, deadline, done: false };
-    if (GUEST_MODE) { lsInsert('todos', row); }
-    else { await sb.from('trip_todos').insert(row); }
-    logActivity('added_todo', title, 'todo');
+    let newId = null;
+    if (GUEST_MODE) { newId = lsInsert('todos', row).id; }
+    else {
+      const { data } = await sb.from('trip_todos').insert(row).select().single();
+      newId = data?.id;
+    }
+    logActivity('added_todo', title, 'todo', newId);
   }
   _editingTodoId = null;
   closeAll();
