@@ -389,13 +389,13 @@ async function runCapture() {
     return;
   }
 
-  const { error } = await sb.from('places').insert({
+  const { data, error } = await sb.from('places').insert({
     trip_id: TRIP_ID, country_id: country.id, name: cap(cityName),
     lat: geo.lat, lng: geo.lng, source_url: url || null,
-  });
+  }).select().single();
   if (error) return capMsg(error.message);
   closeAll(); await refreshAll();
-  logActivity('added_place', cap(cityName) + ', ' + cap(countryName), 'place');
+  logActivity('added_place', cap(cityName) + ', ' + cap(countryName), 'place', data.id);
 }
 
 /* ---------------- RENDER: COUNTRIES ---------------- */
