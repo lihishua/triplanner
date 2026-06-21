@@ -576,7 +576,7 @@ function openCountry(id) {
     <div class="places-header">Places to visit</div>
 
     ${pts.map(p => `
-      <div class="place-item">
+      <div class="place-item" data-id="${p.id}">
         <span class="place-item-name" onclick="openCity('${p.id}')">📍 ${esc(p.name)}</span>
         <input type="number" min="0.5" max="365" step="0.5"
           value="${p.planned_days || ''}" placeholder="days"
@@ -750,7 +750,7 @@ function renderFlights() {
   const el = document.getElementById('flightList');
   if (!flights.length) { el.innerHTML = '<div class="empty">No flights yet.</div>'; return; }
   el.innerHTML = flights.map(f => `
-    <div class="card" onclick="editFlight('${f.id}')" style="cursor:pointer">
+    <div class="card" data-id="${f.id}" onclick="editFlight('${f.id}')" style="cursor:pointer">
       <button class="del" onclick="event.stopPropagation();delFlight('${f.id}')">×</button>
       <div class="flight-route"><span>${esc(f.origin)||'—'}</span>
         <span class="arrow"></span><span>${esc(f.destination)||'—'}</span></div>
@@ -1665,7 +1665,7 @@ function renderTodos() {
     const deadlineLabel = t.deadline
       ? new Date(t.deadline + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
       : '';
-    return `<div class="todo-item">
+    return `<div class="todo-item" data-id="${t.id}">
       <div class="todo-check${t.done ? ' done' : ''}" onclick="toggleTodo('${t.id}')">
         ${t.done ? '✓' : ''}
       </div>
