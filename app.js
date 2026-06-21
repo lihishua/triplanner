@@ -243,6 +243,7 @@ async function ensureCountry(name, flag) {
     .insert({ trip_id: TRIP_ID, name, flag }).select().single();
   if (error) { alert(error.message); return null; }
   countries.push(data);
+  logActivity('added_country', name, 'country', data.id);
   return data;
 }
 
@@ -1625,7 +1626,6 @@ async function confirmSuggestion(mid) {
   }
   await refreshAll();
   renderChat();
-  logActivity('confirmed_suggestion', `✓ ${s.name}${s.country ? ', ' + s.country : ''}`, 'place');
 }
 
 async function clearChat() {
