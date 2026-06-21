@@ -43,3 +43,6 @@ create table if not exists trip_activity (
 alter table trip_activity enable row level security;
 create policy activity_all on trip_activity for all
   using (is_trip_member(trip_id)) with check (is_trip_member(trip_id));
+
+-- Update Center: structured grouping data (currently only used by 'added_flight')
+alter table trip_activity add column if not exists meta jsonb;
