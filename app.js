@@ -793,7 +793,10 @@ async function saveFlight() {
   ['origin','destination','airline','flight_no','depart_date','depart_time','price','notes']
     .forEach(k => f[k] = val('f-'+k).trim());
 
-  if (_editingFlightId) {
+  const wasEditing = !!_editingFlightId;
+  let newId = null;
+
+  if (wasEditing) {
     if (GUEST_MODE) { lsUpdate('flights', _editingFlightId, f); }
     else {
       const { error } = await sb.from('flights').update(f).eq('id', _editingFlightId);
@@ -802,15 +805,16 @@ async function saveFlight() {
   } else {
     if (GUEST_MODE) { lsInsert('flights', f); }
     else {
-      const { error } = await sb.from('flights').insert(f);
+      const { data, error } = await sb.from('flights').insert(f).select().single();
       if (error) return alert(error.message);
+      newId = data.id;
     }
   }
   _editingFlightId = null;
   closeAll(); await refreshAll();
-  if (!_editingFlightId) logActivity('added_flight',
+  if (!wasEditing) logActivity('added_flight',
     `${f.origin || '?'} → ${f.destination || '?'}${f.depart_date ? ' · ' + f.depart_date : ''}${f.airline ? ' · ' + f.airline : ''}`,
-    'flight');
+    'flight', newId, { origin: f.origin || '?', destination: f.destination || '?' });
 }
 
 async function delFlight(id){
@@ -1804,7 +1808,7 @@ async function skipAiTodo(idx, btn) {
 /* ================================================================
    FEATURE 3: ACTIVITY FEED
    ================================================================ */
-async function logActivity(action, summary, entityType = null, entityId = null) {
+async function logActivity(action, summary, entityType = null, entityId = null, meta = null) {
   if (GUEST_MODE || !TRIP_ID) return;
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return;
@@ -1815,6 +1819,7 @@ async function logActivity(action, summary, entityType = null, entityId = null) 
     summary,
     entity_type: entityType,
     entity_id: entityId ? String(entityId) : null,
+    meta,
     seen_by: [user.id],
   }).catch(() => {});
 }
