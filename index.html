@@ -103,6 +103,10 @@
   input,textarea,select{width:100%;font-family:'Newsreader',serif;font-size:16px;padding:10px 12px;
     border:1px solid var(--line);border-radius:11px;background:#fff;color:var(--ink);resize:vertical}
   input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  input[type=checkbox]{width:auto;padding:0;border:none;background:none;accent-color:var(--accent);transform:scale(1.1)}
+  .checkbox-row{display:flex;align-items:center;gap:8px;margin:14px 0 6px;font-family:'Fraunces',serif;font-size:14px;color:var(--ink-soft);cursor:pointer}
+  .flight-booked{color:var(--accent);background:var(--accent-soft)}
+  .flight-option{color:var(--ink-soft)}
   .budget-bar{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);
     box-shadow:var(--shadow);padding:20px 22px;margin-bottom:16px}
   .budget-bar .nums{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px}
@@ -416,6 +420,7 @@
         </div>
       </div>
       <div id="budgetSummary"></div>
+      <div id="bookedFlightsLine"></div>
       <div id="budgetByCat"></div>
       <div class="grid flights" id="expenseList" style="margin-top:18px"></div>
     </section>
@@ -560,6 +565,7 @@
   <div class="row"><div><label>Date</label><input id="f-depart_date"></div>
     <div><label>Time</label><input id="f-depart_time"></div></div>
   <label>Price</label><input id="f-price">
+  <label class="checkbox-row"><input type="checkbox" id="f-booked"> Booked (not just an option)</label>
   <label>Notes</label><textarea id="f-notes" rows="2"></textarea>
   <div class="modal-actions"><button class="btn ghost" onclick="closeAll()">Cancel</button>
     <button id="f-save-btn" class="btn" onclick="saveFlight()">Save flight</button></div>

@@ -46,3 +46,6 @@ create policy activity_all on trip_activity for all
 
 -- Update Center: structured grouping data (currently only used by 'added_flight')
 alter table trip_activity add column if not exists meta jsonb;
+
+-- Mark a flight as actually booked, vs. still an option you're considering
+alter table flights add column if not exists booked boolean not null default false;

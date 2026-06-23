@@ -755,6 +755,7 @@ function renderFlights() {
       <div class="flight-route"><span>${esc(f.origin)||'—'}</span>
         <span class="arrow"></span><span>${esc(f.destination)||'—'}</span></div>
       <div class="flight-meta">
+        <span class="pill ${f.booked ? 'flight-booked' : 'flight-option'}">${f.booked ? '✓ Booked' : 'Option'}</span>
         ${f.airline?`<span><b>${esc(f.airline)}</b> ${esc(f.flight_no)||''}</span>`:''}
         ${f.depart_date?`<span>${esc(f.depart_date)} ${esc(f.depart_time)||''}</span>`:''}
         ${f.price?`<span class="pill">${esc(f.price)}</span>`:''}
@@ -769,6 +770,7 @@ function openFlight() {
   document.getElementById('f-save-btn').textContent = 'Save flight';
   ['origin','destination','airline','flight_no','depart_date','depart_time','price','notes']
     .forEach(k => document.getElementById('f-'+k).value = '');
+  document.getElementById('f-booked').checked = false;
   openOverlay('ov-flight');
 }
 
@@ -779,6 +781,7 @@ function editFlight(id) {
   document.getElementById('f-save-btn').textContent = 'Update flight';
   ['origin','destination','airline','flight_no','depart_date','depart_time','price','notes']
     .forEach(k => document.getElementById('f-'+k).value = f[k] || '');
+  document.getElementById('f-booked').checked = !!f.booked;
   ['origin','destination'].forEach(k => {
     const iata = (f[k] || '').toUpperCase();
     const airport = AIRPORTS.find(a => a[0] === iata);
@@ -792,6 +795,7 @@ async function saveFlight() {
   const f = { trip_id: TRIP_ID };
   ['origin','destination','airline','flight_no','depart_date','depart_time','price','notes']
     .forEach(k => f[k] = val('f-'+k).trim());
+  f.booked = document.getElementById('f-booked').checked;
 
   const wasEditing = !!_editingFlightId;
   let newId = null;
@@ -830,10 +834,41 @@ function fmtMoney(n, cur){
   return (cur||'USD') + ' ' + v;
 }
 
+// Best-effort: flight prices are free-text (e.g. "$176", "~$400", "TBD"),
+// not structured numbers, so this can't be merged into the real expense total.
+function parsePrice(str) {
+  const n = parseFloat((str || '').replace(/[^0-9.]/g, ''));
+  return Number.isFinite(n) ? n : null;
+}
+
+function renderBookedFlightsLine() {
+  const el = document.getElementById('bookedFlightsLine');
+  if (!el) return;
+  const booked = flights.filter(f => f.booked);
+  if (!booked.length) { el.innerHTML = ''; return; }
+  const parsed = booked.map(f => parsePrice(f.price)).filter(n => n !== null);
+  const sum = parsed.reduce((s, n) => s + n, 0);
+  const symbol = (booked.find(f => f.price?.includes('$'))) ? '$'
+    : (booked.find(f => f.price?.includes('€'))) ? '€'
+    : (booked.find(f => f.price?.includes('£'))) ? '£' : '';
+  const unparsed = booked.length - parsed.length;
+  el.innerHTML = `<div class="catwrap" style="margin-bottom:16px">
+    <div class="catrow"><span class="cname">Booked flights</span>
+      <span style="flex:1;color:var(--ink-soft);font-size:14px">
+        ${booked.length} flight${booked.length === 1 ? '' : 's'} marked booked
+        ${unparsed ? ` · ${unparsed} without a clear price` : ''}
+      </span>
+      <span class="camt">${symbol}${sum.toLocaleString(undefined,{maximumFractionDigits:2})}</span>
+    </div>
+  </div>`;
+}
+
 function renderBudget(){
   const baseCur = budgetTarget?.base_currency || (expenses[0]?.currency) || 'USD';
   const total = expenses.reduce((s,e)=>s + Number(e.amount||0), 0);
   const target = budgetTarget?.total_budget ? Number(budgetTarget.total_budget) : null;
+
+  renderBookedFlightsLine();
 
   const sum = document.getElementById('budgetSummary');
   let pct = target ? Math.min(100, Math.round(total/target*100)) : 0;
