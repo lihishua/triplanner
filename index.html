@@ -43,7 +43,9 @@
   .brand h1{font-family:'Fraunces',serif;font-weight:600;font-size:30px;letter-spacing:-.5px;line-height:1}
   .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--gold);display:inline-block;transform:translateY(-2px)}
   .brand small{color:var(--ink-soft);font-style:italic;font-size:15px}
-  .top-actions{display:flex;gap:10px}
+  .top-actions{display:flex;gap:10px;max-width:100%;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
+  .top-actions::-webkit-scrollbar{display:none}
+  .top-actions button{flex-shrink:0;white-space:nowrap}
 
   nav.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-top:18px;
     overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
