@@ -86,7 +86,7 @@ async function doLogout() {
     GUEST_MODE = false;
     TRIP_ID = null;
     localStorage.removeItem('triplanner_guest_mode');
-    document.getElementById('logout-btn').textContent = 'Log out';
+    document.getElementById('logout-btn').textContent = 'Sign out';
     showAuth();
     return;
   }

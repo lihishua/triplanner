@@ -39,16 +39,18 @@
   #au-msg{color:var(--ink-soft);font-size:13px;margin-top:14px;min-height:18px}
 
   header.top{display:flex;align-items:baseline;justify-content:space-between;padding:34px 0 10px;gap:16px;flex-wrap:wrap}
+  #logout-btn{margin-left:auto}
   .brand{display:flex;align-items:baseline;gap:12px}
   .brand h1{font-family:'Fraunces',serif;font-weight:600;font-size:30px;letter-spacing:-.5px;line-height:1}
   .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--gold);display:inline-block;transform:translateY(-2px)}
   .brand small{color:var(--ink-soft);font-style:italic;font-size:15px}
-  .top-actions{display:flex;gap:10px;max-width:100%;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
+  .top-actions{display:flex;gap:10px;max-width:100%;margin-top:14px;overflow-x:auto;touch-action:pan-x;
+    scrollbar-width:none;-ms-overflow-style:none}
   .top-actions::-webkit-scrollbar{display:none}
   .top-actions button{flex-shrink:0;white-space:nowrap}
 
   nav.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-top:18px;
-    overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
+    overflow-x:auto;touch-action:pan-x;scrollbar-width:none;-ms-overflow-style:none}
   nav.tabs::-webkit-scrollbar{display:none}
   nav.tabs button{font-family:'Fraunces',serif;font-size:16px;color:var(--ink-soft);background:none;
     border:none;padding:12px 16px;cursor:pointer;position:relative;border-radius:10px 10px 0 0;flex-shrink:0}
@@ -316,7 +318,7 @@
   <div class="authcard">
     <span class="dot"></span>
     <h1>TriPlan</h1>
-    <small>our trip, together</small>
+    <small>plan your trip. together.</small>
     <input id="au-email" type="email" placeholder="email" autocomplete="email">
     <input id="au-pass" type="password" placeholder="password" autocomplete="current-password">
     <div class="au-btns">
@@ -364,15 +366,15 @@
 <div id="app" style="display:none">
   <div class="wrap">
     <header class="top">
-      <div class="brand"><span class="dot"></span><h1>TriPlan</h1><small>our trip, together</small></div>
-      <div class="top-actions">
-        <button class="btn ghost" onclick="suggestItinerary()">✦ Plan</button>
-        <button class="btn ghost" onclick="previewTrip()">▶ Preview trip</button>
-        <button id="updates-btn" class="btn ghost" onclick="openOverlay('ov-updates')">🔔 Updates<span id="updates-dot" class="updates-dot" style="display:none"></span></button>
-        <button id="logout-btn" class="btn ghost" onclick="doLogout()">Log out</button>
-      </div>
+      <div class="brand"><span class="dot"></span><h1>TriPlan</h1><small>plan your trip. together.</small></div>
+      <button id="logout-btn" class="btn ghost small" onclick="doLogout()">Sign out</button>
     </header>
     <div id="trip-carousel" class="trip-carousel" style="display:none"></div>
+    <div class="top-actions">
+      <button class="btn ghost" onclick="suggestItinerary()">✦ Help me plan</button>
+      <button class="btn ghost" onclick="previewTrip()">🌍 Trip on globe</button>
+      <button id="updates-btn" class="btn ghost" onclick="openOverlay('ov-updates')">🔔 Updates<span id="updates-dot" class="updates-dot" style="display:none"></span></button>
+    </div>
 
     <nav class="tabs">
       <button class="active" data-tab="countries" onclick="showTab('countries')">Countries</button>
