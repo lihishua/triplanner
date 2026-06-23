@@ -510,6 +510,10 @@
   <textarea id="pref-notes" rows="2" placeholder="e.g. 4 young kids (ages 2–8), need child-friendly activities, prefer not too much walking"
     onchange="savePrefNotes()"></textarea>
 
+  <label>Nationality / passport <span style="font-weight:400;font-style:italic;color:var(--ink-soft)">for visa lookups</span></label>
+  <input id="pref-nationality" placeholder="e.g. Israeli, both of us — or Lihi: Israeli, Tomer: American"
+    onchange="savePrefNationality()">
+
   <div class="modal-actions" style="margin-top:14px">
     <button class="btn ghost" onclick="closeAll()">Close</button>
     <button class="btn" onclick="generatePlan()">✦ Generate plan</button>

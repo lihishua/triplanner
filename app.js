@@ -422,7 +422,7 @@ function renderCountries() {
 }
 
 /* ---------------- TRAVEL PREFERENCES ---------------- */
-let tripPreferences = { likes: [], dislikes: [], notes: '' };
+let tripPreferences = { likes: [], dislikes: [], notes: '', nationality: '' };
 
 const PREF_LIKE_SUGGESTIONS = ['Nature & outdoors','Beaches','Mountains','Scenic views','National parks',
   'Luxury hotels','Local food','Kid-friendly','Adventure','Quiet places','Boutique stays','Swimming'];
@@ -451,6 +451,7 @@ function renderPrefChips() {
     dislikeSugg.map(s => `<button class="pref-sugg" onclick="quickAddPref('dislike','${esc(s)}')">${esc(s)}</button>`).join('');
 
   document.getElementById('pref-notes').value = tripPreferences.notes || '';
+  document.getElementById('pref-nationality').value = tripPreferences.nationality || '';
 }
 
 function addPref(type) {
@@ -481,6 +482,11 @@ function savePrefNotes() {
   savePreferences();
 }
 
+function savePrefNationality() {
+  tripPreferences.nationality = document.getElementById('pref-nationality').value;
+  savePreferences();
+}
+
 async function savePreferences() {
   if (GUEST_MODE) { lsUpdate('trips_prefs', TRIP_ID, tripPreferences); return; }
   await sb.from('trips').update({ preferences: tripPreferences }).eq('id', TRIP_ID);
@@ -490,11 +496,11 @@ async function loadPreferences() {
   if (!TRIP_ID) return;
   if (GUEST_MODE) {
     const stored = lsGet('trips_prefs').find(r => r.id === TRIP_ID);
-    tripPreferences = { likes: [], dislikes: [], notes: '', ...(stored || {}) };
+    tripPreferences = { likes: [], dislikes: [], notes: '', nationality: '', ...(stored || {}) };
     return;
   }
   const { data } = await sb.from('trips').select('preferences').eq('id', TRIP_ID).single();
-  tripPreferences = { likes: [], dislikes: [], notes: '', ...(data?.preferences || {}) };
+  tripPreferences = { likes: [], dislikes: [], notes: '', nationality: '', ...(data?.preferences || {}) };
 }
 
 async function suggestItinerary() {
@@ -518,11 +524,23 @@ async function generatePlan() {
     from: f.origin, to: f.destination, date: f.depart_date,
     airline: f.airline, price: f.price,
   }));
+
+  const wantsVisaInfo = countries.length > 0 && !!tripPreferences.nationality?.trim();
+
   try {
-    const { data, error } = await sb.functions.invoke('plan-trip', {
-      body: { places: placesData, flights: flightsData, preferences: tripPreferences },
-    });
-    if (error) { out.textContent = error.message || JSON.stringify(error); return; }
+    const [planResult, visaResult] = await Promise.all([
+      sb.functions.invoke('plan-trip', {
+        body: { places: placesData, flights: flightsData, preferences: tripPreferences },
+      }),
+      wantsVisaInfo
+        ? sb.functions.invoke('visa-info', {
+            body: { countries: countries.map(c => c.name), nationality: tripPreferences.nationality },
+          })
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+
+    if (planResult.error) { out.textContent = planResult.error.message || JSON.stringify(planResult.error); return; }
+    const data = planResult.data;
 
     // Render narrative
     out.innerHTML = `<div style="white-space:pre-wrap;line-height:1.6">${esc(data.suggestion || '')}</div>`;
@@ -543,9 +561,37 @@ async function generatePlan() {
           </div>`).join('')}
       </div>`;
     }
+
+    // Render visa & bureaucracy section
+    out.innerHTML += `<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">
+      <div style="font-family:'Fraunces',serif;font-weight:600;font-size:14px;margin-bottom:10px;color:var(--ink-soft)">Visa & bureaucracy</div>
+      ${renderVisaSection(wantsVisaInfo, visaResult)}
+    </div>`;
   } catch (e) {
     out.textContent = 'Error: ' + String(e);
   }
+}
+
+function renderVisaSection(wantsVisaInfo, visaResult) {
+  if (!wantsVisaInfo) {
+    return `<div style="color:var(--ink-soft);font-size:14px">Add your nationality in preferences above to get visa requirements for each country.</div>`;
+  }
+  if (visaResult?.error) {
+    return `<div style="color:var(--ink-soft);font-size:14px">Couldn't look up visa info: ${esc(visaResult.error.message || String(visaResult.error))}</div>`;
+  }
+  const visas = visaResult?.data?.visas || [];
+  if (!visas.length) {
+    return `<div style="color:var(--ink-soft);font-size:14px">No visa information found.</div>`;
+  }
+  return visas.map(v => `
+    <div style="padding:8px 0;border-bottom:1px solid var(--line)">
+      <div style="font-family:'Fraunces',serif;font-weight:600;font-size:15px">
+        ${esc(v.country)}
+        ${v.max_stay ? `<span style="color:var(--ink-soft);font-weight:400;font-size:13px"> · ${esc(v.max_stay)}</span>` : ''}
+      </div>
+      <div style="font-size:14px;margin-top:2px">${esc(v.summary || '')}</div>
+    </div>`).join('') +
+    `<div style="color:var(--ink-soft);font-size:12px;font-style:italic;margin-top:8px">Always confirm with the official embassy/immigration site before booking — rules change.</div>`;
 }
 
 async function addSuggestedCountry(name, days, btnIdx) {
