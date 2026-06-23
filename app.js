@@ -1176,17 +1176,23 @@ async function addResearchFlightToTrip(researchId, idx, btn) {
     notes:      noteParts.join(' · ') || null,
   };
 
+  let newId = null;
   if (GUEST_MODE) {
-    lsInsert('flights', row);
+    newId = lsInsert('flights', row).id;
     flights = lsGet('flights').filter(r => r.trip_id === TRIP_ID);
     renderFlights();
   } else {
-    const { error } = await sb.from('flights').insert(row);
+    const { data, error } = await sb.from('flights').insert(row).select().single();
     if (error) { alert(error.message); return; }
-    const { data } = await sb.from('flights').select('*').order('created_at');
-    flights = data || [];
+    newId = data?.id;
+    const { data: allFlights } = await sb.from('flights').select('*').order('created_at');
+    flights = allFlights || [];
     renderFlights();
   }
+
+  logActivity('added_flight',
+    `${row.origin || '?'} → ${row.destination || '?'}${row.depart_date ? ' · ' + row.depart_date : ''}${row.airline ? ' · ' + row.airline : ''}`,
+    'flight', newId, { origin: row.origin || '?', destination: row.destination || '?' });
 
   btn.textContent = '✓ Added to trip';
   btn.disabled = true;
