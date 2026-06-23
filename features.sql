@@ -49,3 +49,19 @@ alter table trip_activity add column if not exists meta jsonb;
 
 -- Mark a flight as actually booked, vs. still an option you're considering
 alter table flights add column if not exists booked boolean not null default false;
+
+-- Feature 4: Hotels (liked or booked, per country)
+create table if not exists hotels (
+  id          uuid primary key default gen_random_uuid(),
+  trip_id     uuid not null references trips(id) on delete cascade,
+  country_id  uuid not null references countries(id) on delete cascade,
+  name        text not null,
+  link        text,
+  price       text,
+  notes       text,
+  booked      boolean not null default false,
+  created_at  timestamptz not null default now()
+);
+alter table hotels enable row level security;
+create policy hotels_all on hotels for all
+  using (is_trip_member(trip_id)) with check (is_trip_member(trip_id));

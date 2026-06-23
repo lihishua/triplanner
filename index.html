@@ -571,6 +571,17 @@
     <button id="f-save-btn" class="btn" onclick="saveFlight()">Save flight</button></div>
 </div></div>
 
+<div class="overlay" id="ov-hotel"><div class="modal">
+  <h3 id="hotel-modal-title">Add hotel</h3><div class="sub">Liked it, or already booked it?</div>
+  <label>Name</label><input id="h-name" placeholder="Hotel name">
+  <label>Link</label><input id="h-link" placeholder="https://…">
+  <label>Price</label><input id="h-price" placeholder="e.g. $120/night">
+  <label class="checkbox-row"><input type="checkbox" id="h-booked"> Booked (not just liked)</label>
+  <label>Notes</label><textarea id="h-notes" rows="2"></textarea>
+  <div class="modal-actions"><button class="btn ghost" onclick="closeAll()">Cancel</button>
+    <button id="h-save-btn" class="btn" onclick="saveHotel()">Save hotel</button></div>
+</div></div>
+
 <!-- Expense + target modals -->
 <div class="overlay" id="ov-expense"><div class="modal">
   <h3>Add expense</h3><div class="sub">Track what you've spent.</div>

@@ -9,6 +9,7 @@ let myTrips = [];
 let countries = [];
 let places = [];
 let flights = [];
+let hotels = [];
 let expenses = [];
 let budgetTarget = null;
 let research = [];
@@ -205,11 +206,13 @@ async function refreshAll() {
     const allCountries = lsGet('countries');
     const allCities    = lsGet('places');
     const allFlights   = lsGet('flights');
+    const allHotels    = lsGet('hotels');
     const allExpenses  = lsGet('expenses');
     const allBudget    = lsGet('budget_settings');
     countries    = allCountries.filter(r => r.trip_id === TRIP_ID);
     places       = allCities.filter(r => r.trip_id === TRIP_ID);
     flights      = allFlights.filter(r => r.trip_id === TRIP_ID);
+    hotels       = allHotels.filter(r => r.trip_id === TRIP_ID);
     expenses     = allExpenses.filter(r => r.trip_id === TRIP_ID)
                               .sort((a,b) => (b.spent_on||'').localeCompare(a.spent_on||''));
     budgetTarget = allBudget.find(r => r.trip_id === TRIP_ID) || null;
@@ -218,15 +221,16 @@ async function refreshAll() {
     renderCountries(); renderFlights(); renderResearch(); renderBudget();
     return;
   }
-  const [c, ci, f, ex, bs, res] = await Promise.all([
+  const [c, ci, f, h, ex, bs, res] = await Promise.all([
     sb.from('countries').select('*').order('created_at'),
     sb.from('places').select('*').order('created_at'),
     sb.from('flights').select('*').order('created_at'),
+    sb.from('hotels').select('*').order('created_at'),
     sb.from('expenses').select('*').order('spent_on', { ascending: false }),
     sb.from('budget_settings').select('*').eq('trip_id', TRIP_ID).maybeSingle(),
     sb.from('flight_research').select('*').eq('trip_id', TRIP_ID).order('created_at', { ascending: false }),
   ]);
-  countries = c.data || []; places = ci.data || []; flights = f.data || [];
+  countries = c.data || []; places = ci.data || []; flights = f.data || []; hotels = h.data || [];
   expenses = ex.data || []; budgetTarget = bs.data || null; research = res.data || [];
   renderCountries(); renderFlights(); renderResearch(); renderBudget();
 }
@@ -560,6 +564,7 @@ async function addSuggestedCountry(name, days, btnIdx) {
 function openCountry(id) {
   const c = countries.find(x => x.id === id); if (!c) return;
   const pts = places.filter(ci => ci.country_id === id);
+  const hts = hotels.filter(h => h.country_id === id);
   const placeTotal = pts.reduce((s, p) => s + (p.planned_days || 0), 0);
   const over = c.planned_days && placeTotal > c.planned_days;
 
@@ -602,6 +607,23 @@ function openCountry(id) {
       <input id="new-place-${c.id}" placeholder="City, park, restaurant, beach…" style="flex:1"
         onkeydown="if(event.key==='Enter')addPlaceToCountry('${c.id}')">
       <button class="btn small" onclick="addPlaceToCountry('${c.id}')">Add</button>
+    </div>
+
+    <div class="places-header" style="margin-top:24px">Hotels</div>
+
+    ${hts.map(h => `
+      <div class="place-item" data-id="${h.id}">
+        <span class="place-item-name" onclick="openHotel('${h.id}')" style="flex:2">${esc(h.name)}</span>
+        <span class="pill ${h.booked ? 'flight-booked' : 'flight-option'}">${h.booked ? '✓ Booked' : 'Liked'}</span>
+        ${h.price ? `<span class="pill">${esc(h.price)}</span>` : ''}
+        ${h.link ? `<a href="${esc(h.link)}" target="_blank" style="text-decoration:none;font-size:15px">🔗</a>` : ''}
+        <button class="del" style="position:static;opacity:.35;font-size:17px;margin-left:2px"
+          onclick="deleteHotel('${h.id}','${c.id}')">×</button>
+      </div>`).join('')}
+    ${!hts.length ? '<div class="empty" style="margin:8px 0 12px">No hotels yet — add some below.</div>' : ''}
+
+    <div class="add-place-row">
+      <button class="btn small" onclick="openAddHotel('${c.id}')">＋ Add hotel</button>
     </div>`;
 
   openOverlay('ov-detail');
@@ -685,6 +707,73 @@ async function openCity(id) {
   openOverlay('ov-detail');
   if (c.lat && c.lng) loadWeather(c.lat, c.lng);
   else document.getElementById('wx').textContent = 'No coordinates saved for weather.';
+}
+
+/* ---------------- HOTELS ---------------- */
+let _editingHotelId = null;
+let _hotelCountryId = null;
+
+function openAddHotel(countryId) {
+  _editingHotelId = null;
+  _hotelCountryId = countryId;
+  document.getElementById('hotel-modal-title').textContent = 'Add hotel';
+  document.getElementById('h-save-btn').textContent = 'Save hotel';
+  ['name','link','price','notes'].forEach(k => document.getElementById('h-'+k).value = '');
+  document.getElementById('h-booked').checked = false;
+  openOverlay('ov-hotel');
+}
+
+function openHotel(id) {
+  const h = hotels.find(x => x.id === id); if (!h) return;
+  _editingHotelId = id;
+  _hotelCountryId = h.country_id;
+  document.getElementById('hotel-modal-title').textContent = 'Edit hotel';
+  document.getElementById('h-save-btn').textContent = 'Update hotel';
+  document.getElementById('h-name').value = h.name || '';
+  document.getElementById('h-link').value = h.link || '';
+  document.getElementById('h-price').value = h.price || '';
+  document.getElementById('h-notes').value = h.notes || '';
+  document.getElementById('h-booked').checked = !!h.booked;
+  openOverlay('ov-hotel');
+}
+
+async function saveHotel() {
+  const name = val('h-name').trim();
+  if (!name) return;
+  const countryId = _hotelCountryId;
+  const fields = {
+    name,
+    link: val('h-link').trim() || null,
+    price: val('h-price').trim() || null,
+    notes: val('h-notes').trim() || null,
+    booked: document.getElementById('h-booked').checked,
+  };
+
+  if (_editingHotelId) {
+    const h = hotels.find(x => x.id === _editingHotelId);
+    if (h) Object.assign(h, fields);
+    if (GUEST_MODE) { lsUpdate('hotels', _editingHotelId, fields); }
+    else { await sb.from('hotels').update(fields).eq('id', _editingHotelId); }
+  } else {
+    const row = { ...fields, trip_id: TRIP_ID, country_id: countryId };
+    if (GUEST_MODE) {
+      hotels.push(lsInsert('hotels', row));
+    } else {
+      const { data, error } = await sb.from('hotels').insert(row).select().single();
+      if (error) { alert(error.message); return; }
+      hotels.push(data);
+    }
+  }
+  _editingHotelId = null;
+  closeAll();
+  openCountry(countryId);
+}
+
+async function deleteHotel(id, countryId) {
+  hotels = hotels.filter(h => h.id !== id);
+  if (GUEST_MODE) { lsDelete('hotels', id); }
+  else await sb.from('hotels').delete().eq('id', id);
+  openCountry(countryId);
 }
 
 /* ---------------- WEATHER (Open-Meteo, free) ---------------- */
