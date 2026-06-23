@@ -890,7 +890,10 @@ function renderFlights() {
       <div class="flight-route"><span>${esc(f.origin)||'—'}</span>
         <span class="arrow"></span><span>${esc(f.destination)||'—'}</span></div>
       <div class="flight-meta">
-        <span class="pill ${f.booked ? 'flight-booked' : 'flight-option'}">${f.booked ? '✓ Booked' : 'Option'}</span>
+        <span style="display:inline-flex;align-items:center;gap:6px;cursor:pointer" onclick="event.stopPropagation();toggleFlightBooked('${f.id}')">
+          <span class="todo-check${f.booked ? ' done' : ''}" style="width:18px;height:18px">${f.booked ? '✓' : ''}</span>
+          <span>Booked</span>
+        </span>
         ${f.airline?`<span><b>${esc(f.airline)}</b> ${esc(f.flight_no)||''}</span>`:''}
         ${f.depart_date?`<span>${esc(f.depart_date)} ${esc(f.depart_time)||''}</span>`:''}
         ${f.price?`<span class="pill">${esc(f.price)}</span>`:''}
@@ -899,13 +902,20 @@ function renderFlights() {
     </div>`).join('');
 }
 
+async function toggleFlightBooked(id) {
+  const f = flights.find(x => x.id === id); if (!f) return;
+  f.booked = !f.booked;
+  if (GUEST_MODE) { lsUpdate('flights', id, { booked: f.booked }); }
+  else { await sb.from('flights').update({ booked: f.booked }).eq('id', id); }
+  renderFlights();
+}
+
 function openFlight() {
   _editingFlightId = null;
   document.querySelector('#ov-flight .modal h3').textContent = 'Add flight';
   document.getElementById('f-save-btn').textContent = 'Save flight';
   ['origin','destination','airline','flight_no','depart_date','depart_time','price','notes']
     .forEach(k => document.getElementById('f-'+k).value = '');
-  document.getElementById('f-booked').checked = false;
   openOverlay('ov-flight');
 }
 
@@ -916,7 +926,6 @@ function editFlight(id) {
   document.getElementById('f-save-btn').textContent = 'Update flight';
   ['origin','destination','airline','flight_no','depart_date','depart_time','price','notes']
     .forEach(k => document.getElementById('f-'+k).value = f[k] || '');
-  document.getElementById('f-booked').checked = !!f.booked;
   ['origin','destination'].forEach(k => {
     const iata = (f[k] || '').toUpperCase();
     const airport = AIRPORTS.find(a => a[0] === iata);
@@ -930,7 +939,6 @@ async function saveFlight() {
   const f = { trip_id: TRIP_ID };
   ['origin','destination','airline','flight_no','depart_date','depart_time','price','notes']
     .forEach(k => f[k] = val('f-'+k).trim());
-  f.booked = document.getElementById('f-booked').checked;
 
   const wasEditing = !!_editingFlightId;
   let newId = null;
