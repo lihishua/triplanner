@@ -1442,7 +1442,7 @@ async function geocodePlace(q) {
   if (ap) {
     try {
       const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='
-        + encodeURIComponent(ap[1] + ' ' + ap[3]));
+        + encodeURIComponent(ap[1] + ', ' + ap[3]));
       const j = await r.json();
       if (j[0]) return [+j[0].lon, +j[0].lat];
     } catch (e) {}
