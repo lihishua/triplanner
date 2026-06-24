@@ -66,7 +66,7 @@ function enterAsGuest(persist = true) {
   document.getElementById('auth').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   document.querySelector('footer').textContent = 'Guest mode · data is saved only on this device.';
-  document.getElementById('logout-btn').textContent = 'Exit guest';
+  document.getElementById('logout-btn').title = 'Exit guest';
   refreshAll();
 }
 
@@ -84,13 +84,15 @@ async function doSignup() {
 }
 async function doLogout() {
   if (GUEST_MODE) {
+    if (!confirm('Exit guest mode?')) return;
     GUEST_MODE = false;
     TRIP_ID = null;
     localStorage.removeItem('triplanner_guest_mode');
-    document.getElementById('logout-btn').textContent = 'Sign out';
+    document.getElementById('logout-btn').title = 'Sign out';
     showAuth();
     return;
   }
+  if (!confirm('Sign out?')) return;
   await sb.auth.signOut();
 }
 function authMsg(m){ document.getElementById('au-msg').textContent = m; }
