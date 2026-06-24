@@ -180,24 +180,6 @@
   .todo-ai-reason{font-size:13px;color:var(--ink-soft);margin-bottom:8px}
   .todo-ai-actions{display:flex;gap:8px}
 
-  /* CHAT */
-  .chat-messages{display:flex;flex-direction:column;gap:14px;margin-bottom:16px;
-    min-height:100px;max-height:60vh;overflow-y:auto;padding-right:4px}
-  .chat-msg{max-width:88%;border-radius:16px;padding:12px 16px;font-size:15px;line-height:1.55}
-  .chat-msg.user{background:var(--accent);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
-  .chat-msg.assistant{background:var(--paper);border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:4px}
-  .chat-input-row{display:flex;gap:10px;align-items:flex-end;position:sticky;bottom:0;
-    background:var(--bg);padding:12px 0 4px}
-  .chat-input-row textarea{flex:1;resize:none;font-size:15px;border-radius:12px;padding:10px 14px;
-    border:1px solid var(--line);font-family:'Newsreader',serif}
-  .chat-sugg-cards{display:flex;flex-direction:column;gap:8px;margin-top:10px}
-  .sugg-card{background:var(--paper);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-  .sugg-card-img{width:100%;height:120px;object-fit:cover;display:block;background:var(--accent-soft)}
-  .sugg-card-body{padding:10px 12px}
-  .sugg-card-name{font-family:'Fraunces',serif;font-weight:600;font-size:16px;margin-bottom:3px}
-  .sugg-card-desc{font-size:13px;color:var(--ink-soft);margin-bottom:8px}
-  .sugg-card-actions{display:flex;gap:8px;flex-wrap:wrap}
-
   /* UPDATE CENTER */
   #updates-btn{position:relative}
   .updates-dot{position:absolute;top:5px;right:7px;width:8px;height:8px;border-radius:50%;background:#b4544a}
@@ -385,7 +367,6 @@
       <button data-tab="flights" onclick="showTab('flights')">Flights</button>
       <button data-tab="budget" onclick="showTab('budget')">Budget</button>
       <button data-tab="prep" onclick="showTab('prep')">Prep</button>
-      <button data-tab="chat" onclick="showTab('chat')">✦ Chat</button>
     </nav>
 
     <section class="page active" id="page-countries">
@@ -435,20 +416,6 @@
         </div>
       </div>
       <div id="todoList"></div>
-    </section>
-
-    <!-- CHAT TAB -->
-    <section class="page" id="page-chat">
-      <div class="page-head">
-        <div><h2>Plan with AI</h2><p>Ask anything about your trip.</p></div>
-        <button class="btn ghost small" onclick="clearChat()">Clear history</button>
-      </div>
-      <div id="chatMessages" class="chat-messages"></div>
-      <div class="chat-input-row">
-        <textarea id="chat-input" rows="2" placeholder="Find me a kid-friendly beach in Sri Lanka… or: What should we do first in Goa?"
-          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea>
-        <button class="btn" onclick="sendChat()">Send</button>
-      </div>
     </section>
 
     <footer>Shared between both of you · saved to your Supabase project.</footer>
