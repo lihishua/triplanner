@@ -222,11 +222,11 @@ async function refreshAll() {
     return;
   }
   const [c, ci, f, h, ex, bs, res] = await Promise.all([
-    sb.from('countries').select('*').order('created_at'),
-    sb.from('places').select('*').order('created_at'),
-    sb.from('flights').select('*').order('created_at'),
-    sb.from('hotels').select('*').order('created_at'),
-    sb.from('expenses').select('*').order('spent_on', { ascending: false }),
+    sb.from('countries').select('*').eq('trip_id', TRIP_ID).order('created_at'),
+    sb.from('places').select('*').eq('trip_id', TRIP_ID).order('created_at'),
+    sb.from('flights').select('*').eq('trip_id', TRIP_ID).order('created_at'),
+    sb.from('hotels').select('*').eq('trip_id', TRIP_ID).order('created_at'),
+    sb.from('expenses').select('*').eq('trip_id', TRIP_ID).order('spent_on', { ascending: false }),
     sb.from('budget_settings').select('*').eq('trip_id', TRIP_ID).maybeSingle(),
     sb.from('flight_research').select('*').eq('trip_id', TRIP_ID).order('created_at', { ascending: false }),
   ]);
@@ -1363,7 +1363,7 @@ async function addResearchFlightToTrip(researchId, idx, btn) {
     const { data, error } = await sb.from('flights').insert(row).select().single();
     if (error) { alert(error.message); return; }
     newId = data?.id;
-    const { data: allFlights } = await sb.from('flights').select('*').order('created_at');
+    const { data: allFlights } = await sb.from('flights').select('*').eq('trip_id', TRIP_ID).order('created_at');
     flights = allFlights || [];
     renderFlights();
   }
