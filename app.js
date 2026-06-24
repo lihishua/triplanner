@@ -890,10 +890,10 @@ function renderFlights() {
       <div class="flight-route"><span>${esc(f.origin)||'—'}</span>
         <span class="arrow"></span><span>${esc(f.destination)||'—'}</span></div>
       <div class="flight-meta">
-        <span style="display:inline-flex;align-items:center;gap:6px;cursor:pointer" onclick="event.stopPropagation();toggleFlightBooked('${f.id}')">
-          <span class="todo-check${f.booked ? ' done' : ''}" style="width:18px;height:18px">${f.booked ? '✓' : ''}</span>
+        <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer" onclick="event.stopPropagation()">
+          <input type="checkbox" ${f.booked ? 'checked' : ''} onchange="toggleFlightBooked('${f.id}')">
           <span>Booked</span>
-        </span>
+        </label>
         ${f.airline?`<span><b>${esc(f.airline)}</b> ${esc(f.flight_no)||''}</span>`:''}
         ${f.depart_date?`<span>${esc(f.depart_date)} ${esc(f.depart_time)||''}</span>`:''}
         ${f.price?`<span class="pill">${esc(f.price)}</span>`:''}
