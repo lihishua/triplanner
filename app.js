@@ -1676,23 +1676,86 @@ function hidePreviewCard() {
    FEATURE 2: PRE-TRIP TODO LIST
    ================================================================ */
 let todos = [];
+let prepTabs = [];
+let activePrepTab = 'todos';
+const PREP_BUILTIN_TABS = [
+  { id: 'todos', name: 'Todos' },
+  { id: 'first_aid', name: 'Drugs & First Aid' },
+  { id: 'shopping', name: 'Shopping List' },
+];
+
+function activePrepTabName() {
+  const builtin = PREP_BUILTIN_TABS.find(t => t.id === activePrepTab);
+  if (builtin) return builtin.name;
+  return prepTabs.find(t => t.id === activePrepTab)?.name || 'Todos';
+}
 
 async function refreshTodos() {
-  if (GUEST_MODE) { todos = lsGet('todos').filter(r => r.trip_id === TRIP_ID); renderTodos(); return; }
-  const { data } = await sb.from('trip_todos').select('*').eq('trip_id', TRIP_ID).order('deadline').order('created_at');
-  todos = data || [];
+  if (GUEST_MODE) {
+    todos = lsGet('todos').filter(r => r.trip_id === TRIP_ID);
+    prepTabs = lsGet('prep_tabs').filter(r => r.trip_id === TRIP_ID);
+    renderPrepTabs(); renderTodos();
+    return;
+  }
+  const [t, pt] = await Promise.all([
+    sb.from('trip_todos').select('*').eq('trip_id', TRIP_ID).order('deadline').order('created_at'),
+    sb.from('prep_tabs').select('*').eq('trip_id', TRIP_ID).order('created_at'),
+  ]);
+  todos = t.data || [];
+  prepTabs = pt.data || [];
+  renderPrepTabs(); renderTodos();
+}
+
+function renderPrepTabs() {
+  const el = document.getElementById('prepTabBar');
+  if (!el) return;
+  const allTabs = [...PREP_BUILTIN_TABS, ...prepTabs.map(t => ({ id: t.id, name: t.name }))];
+  if (!allTabs.find(t => t.id === activePrepTab)) activePrepTab = 'todos';
+  el.innerHTML = allTabs.map(t =>
+    `<button class="prep-tab${t.id === activePrepTab ? ' active' : ''}" onclick="switchPrepTab('${t.id}')">${esc(t.name)}</button>`
+  ).join('') + `<button class="prep-tab add" onclick="openAddPrepTab()">＋</button>`;
+}
+
+function switchPrepTab(id) {
+  activePrepTab = id;
+  renderPrepTabs();
+  renderTodos();
+}
+
+function openAddPrepTab() {
+  document.getElementById('prep-tab-name').value = '';
+  openOverlay('ov-prep-tab');
+}
+
+async function savePrepTab() {
+  const name = document.getElementById('prep-tab-name').value.trim();
+  if (!name) return;
+  const row = { trip_id: TRIP_ID, name };
+  let newTab;
+  if (GUEST_MODE) {
+    newTab = lsInsert('prep_tabs', row);
+  } else {
+    const { data, error } = await sb.from('prep_tabs').insert(row).select().single();
+    if (error) { alert(error.message); return; }
+    newTab = data;
+  }
+  prepTabs.push(newTab);
+  activePrepTab = newTab.id;
+  closeAll();
+  renderPrepTabs();
   renderTodos();
 }
 
 function renderTodos() {
   const el = document.getElementById('todoList');
   if (!el) return;
-  if (!todos.length) {
+  const items = todos.filter(t => (t.category || 'todos') === activePrepTab);
+  if (!items.length) {
     el.innerHTML = '<div class="empty">No tasks yet. Add things you need to do before the trip, or ask AI to suggest some.</div>';
     return;
   }
   const today = new Date().toISOString().slice(0, 10);
-  el.innerHTML = todos.map(t => {
+  el.innerHTML = items.map(t => {
     const overdue = t.deadline && !t.done && t.deadline < today;
     const deadlineLabel = t.deadline
       ? new Date(t.deadline + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
@@ -1738,7 +1801,7 @@ async function saveTodo() {
     if (GUEST_MODE) { lsUpdate('todos', _editingTodoId, { title, deadline }); }
     else { await sb.from('trip_todos').update({ title, deadline }).eq('id', _editingTodoId); }
   } else {
-    const row = { trip_id: TRIP_ID, title, deadline, done: false };
+    const row = { trip_id: TRIP_ID, title, deadline, done: false, category: activePrepTab };
     let newId = null;
     if (GUEST_MODE) { newId = lsInsert('todos', row).id; }
     else {

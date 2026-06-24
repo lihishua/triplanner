@@ -65,3 +65,16 @@ create table if not exists hotels (
 alter table hotels enable row level security;
 create policy hotels_all on hotels for all
   using (is_trip_member(trip_id)) with check (is_trip_member(trip_id));
+
+-- Feature 5: Prep tabs (split the pre-trip checklist into categories)
+alter table trip_todos add column if not exists category text not null default 'todos';
+
+create table if not exists prep_tabs (
+  id         uuid primary key default gen_random_uuid(),
+  trip_id    uuid not null references trips(id) on delete cascade,
+  name       text not null,
+  created_at timestamptz not null default now()
+);
+alter table prep_tabs enable row level security;
+create policy prep_tabs_all on prep_tabs for all
+  using (is_trip_member(trip_id)) with check (is_trip_member(trip_id));

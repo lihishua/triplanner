@@ -166,6 +166,15 @@
     border:1px solid var(--line);border-radius:10px}
   .add-place-row input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 
+  /* PREP TABS */
+  .prep-tab-bar{display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;touch-action:pan-x;
+    scrollbar-width:none;-ms-overflow-style:none}
+  .prep-tab-bar::-webkit-scrollbar{display:none}
+  .prep-tab{font-family:'Fraunces',serif;font-size:14px;color:var(--ink-soft);background:var(--paper);
+    border:1px solid var(--line);border-radius:20px;padding:7px 14px;cursor:pointer;flex-shrink:0;white-space:nowrap}
+  .prep-tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .prep-tab.add{color:var(--accent);border-style:dashed}
+
   /* TODO LIST */
   .todo-item{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}
   .todo-check{width:20px;height:20px;border-radius:6px;border:2px solid var(--accent);
@@ -418,6 +427,7 @@
           <button class="btn" onclick="openAddTodo()">＋ Add task</button>
         </div>
       </div>
+      <div id="prepTabBar" class="prep-tab-bar"></div>
       <div id="todoList"></div>
     </section>
 
@@ -436,6 +446,17 @@
   <div class="modal-actions">
     <button class="btn ghost" onclick="closeAll()">Cancel</button>
     <button class="btn" onclick="saveTodo()">Add</button>
+  </div>
+</div></div>
+
+<!-- Add Prep tab modal -->
+<div class="overlay" id="ov-prep-tab"><div class="modal">
+  <h3>New tab</h3>
+  <label>Tab name</label>
+  <input id="prep-tab-name" placeholder="e.g. Kids' stuff">
+  <div class="modal-actions">
+    <button class="btn ghost" onclick="closeAll()">Cancel</button>
+    <button class="btn" onclick="savePrepTab()">Add</button>
   </div>
 </div></div>
 
