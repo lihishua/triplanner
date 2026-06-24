@@ -1830,13 +1830,13 @@ async function deleteTodo(id) {
   renderTodos();
 }
 
-// Track suggested/skipped todos so AI doesn't repeat them
+// Track suggested/skipped todos so AI doesn't repeat them, scoped per tab
 function getSeenTodoTitles() {
-  const key = 'triplan_seen_todos_' + TRIP_ID;
+  const key = 'triplan_seen_todos_' + TRIP_ID + '_' + activePrepTab;
   try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; }
 }
 function addSeenTodoTitle(title) {
-  const key = 'triplan_seen_todos_' + TRIP_ID;
+  const key = 'triplan_seen_todos_' + TRIP_ID + '_' + activePrepTab;
   const seen = getSeenTodoTitles();
   if (!seen.includes(title)) { seen.push(title); localStorage.setItem(key, JSON.stringify(seen)); }
 }
@@ -1845,16 +1845,17 @@ async function suggestTodos() {
   const el = document.getElementById('todoList');
   el.innerHTML = '<div style="color:var(--ink-soft);font-style:italic;padding:20px 0">AI is thinking of what you need to prepare…</div>';
 
+  const category = activePrepTabName();
   const existingTitles = [
-    ...todos.map(t => t.title),
+    ...todos.filter(t => (t.category || 'todos') === activePrepTab).map(t => t.title),
     ...getSeenTodoTitles(),
   ];
   const tripContext = { countries: countries.map(c => ({ name: c.name })), existingTodos: existingTitles };
 
   try {
     const { data, error } = await sb.functions.invoke('chat-plan', {
-      body: { messages: [{ role: 'user', content: 'Suggest pre-trip todos for my family trip.' }],
-              tripContext, preferences: tripPreferences, mode: 'todo' },
+      body: { messages: [{ role: 'user', content: `Suggest items for the ${category} checklist for my family trip.` }],
+              tripContext, preferences: tripPreferences, mode: 'todo', category },
     });
     if (error || !data?.todos?.length) { await refreshTodos(); return; }
     window._aiTodos = data.todos;
@@ -1887,7 +1888,7 @@ function renderAiTodos(reply, aiTodos) {
 
 async function acceptAiTodo(idx, btn) {
   const t = window._aiTodos?.[idx]; if (!t) return;
-  const row = { trip_id: TRIP_ID, title: t.title, deadline: t.deadline || null, done: false };
+  const row = { trip_id: TRIP_ID, title: t.title, deadline: t.deadline || null, done: false, category: activePrepTab };
   if (GUEST_MODE) lsInsert('todos', row);
   else await sb.from('trip_todos').insert(row);
   todos.push({ ...row, id: Date.now().toString(36) });

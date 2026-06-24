@@ -11,14 +11,14 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
   try {
-    const { messages, tripContext, preferences, mode } = await req.json();
+    const { messages, tripContext, preferences, mode, category } = await req.json();
     const key = Deno.env.get("ANTHROPIC_API_KEY");
     if (!key) return json({ error: "AI key not configured." }, 503);
 
     const isTodo = mode === "todo";
 
     const systemPrompt = isTodo
-      ? buildTodoSystemPrompt(tripContext, preferences)
+      ? buildTodoSystemPrompt(tripContext, preferences, category)
       : buildChatSystemPrompt(tripContext, preferences);
 
     const r = await fetch("https://api.anthropic.com/v1/messages", {
@@ -80,23 +80,24 @@ Keep suggestions to 2-3 max. If no specific suggestions, use "suggestions": [].
 Return ONLY valid JSON.`;
 }
 
-function buildTodoSystemPrompt(ctx: any, prefs: any) {
+function buildTodoSystemPrompt(ctx: any, prefs: any, category?: string) {
   const destList = (ctx?.countries || []).map((c: any) => c.name).join(", ");
   const prefText = prefs?.notes || "";
+  const categoryLabel = category || "Todos";
 
   const alreadySeen = (ctx?.existingTodos || []).slice(0, 30).join(", ");
   return `You are helping a family prepare for a trip to: ${destList || "various destinations"}.
 ${prefText ? `Family notes: ${prefText}` : ""}
 ${alreadySeen ? `Already suggested or added (do NOT repeat these): ${alreadySeen}` : ""}
 
-Suggest 4-6 NEW practical pre-trip todos not already in the list above. Return JSON:
+Suggest 4-6 NEW practical items for the "${categoryLabel}" checklist for this trip, not already in the list above. Return JSON:
 {
   "reply": "brief intro sentence",
   "todos": [
     {"title": "What to do", "deadline": "YYYY-MM-DD or null", "reason": "one short reason"}
   ]
 }
-Deadlines should be realistic (2-8 weeks before departure). Return ONLY valid JSON.`;
+Deadlines should be realistic (2-8 weeks before departure) — use null where a deadline doesn't make sense (e.g. shopping list items). Return ONLY valid JSON.`;
 }
 
 function json(body: unknown, status = 200) {
