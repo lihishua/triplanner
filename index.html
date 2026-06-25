@@ -419,12 +419,12 @@
     <section class="page" id="page-prep">
       <div class="page-head">
         <div><h2>Prep</h2><p>Things to do before you go.</p></div>
-        <div style="display:flex;gap:10px">
-          <button class="btn ghost" onclick="suggestTodos()">✦ AI suggest</button>
-          <button class="btn" onclick="openAddTodo()">＋ Add task</button>
-        </div>
       </div>
       <div id="prepTabBar" class="prep-tab-bar"></div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:16px">
+        <button class="btn ghost" onclick="suggestTodos()">✦ AI suggest</button>
+        <button class="btn" onclick="openAddTodo()">＋ Add task</button>
+      </div>
       <div id="todoList"></div>
     </section>
 
