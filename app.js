@@ -791,12 +791,16 @@ function openHotel(id) {
 }
 
 async function saveHotel() {
-  const name = val('h-name').trim();
-  if (!name) return;
+  let name = val('h-name').trim();
+  const link = val('h-link').trim() || null;
+  if (!name) {
+    if (!link) { alert('Enter a hotel name or a link.'); return; }
+    name = 'Untitled hotel';
+  }
   const countryId = _hotelCountryId;
   const fields = {
     name,
-    link: val('h-link').trim() || null,
+    link,
     price: val('h-price').trim() || null,
     notes: val('h-notes').trim() || null,
   };
