@@ -87,11 +87,32 @@ If nothing clear, return {"name": null, "place": null, "country": null, "type": 
       if (match) ({ name, place, country, type } = JSON.parse(match[0]));
     } catch (_) {}
 
+    // Fallback: extract hotel name from URL slug when Claude returns null
+    // e.g. booking.com/hotel/lk/cinnamon-grand-colombo.html → "Cinnamon Grand Colombo"
+    if (!name) name = hotelNameFromSlug(url);
+
     return json({ name, place, country, type });
   } catch (e) {
     return json({ error: String(e) }, 500);
   }
 });
+
+function hotelNameFromSlug(url: string): string | null {
+  try {
+    const u = new URL(url);
+    // booking.com/hotel/<country_code>/<hotel-slug>.html
+    const bookingMatch = u.pathname.match(/\/hotel\/[^/]+\/([^/.]+)/);
+    if (bookingMatch) {
+      return bookingMatch[1].split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    }
+    // agoda.com/en-gb/hotel-name/hotel/...
+    const agodaMatch = u.pathname.match(/\/([^/]+)\/hotel\//);
+    if (agodaMatch) {
+      return agodaMatch[1].split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    }
+  } catch (_) {}
+  return null;
+}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

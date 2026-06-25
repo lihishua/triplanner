@@ -541,6 +541,12 @@ async function runCapture() {
 
   // Hotel → save to hotels section
   if (_capType === 'hotel') {
+    // If name isn't filled yet (user tapped "File it" before extraction finished), run it now
+    if (!document.getElementById('cap-place').value.trim() && url && !GUEST_MODE) {
+      clearTimeout(_urlDebounce);
+      capMsg('Extracting hotel info…');
+      await parseLink(url);
+    }
     const hotelName   = document.getElementById('cap-place').value.trim();
     const cityInput   = document.getElementById('cap-city').value.trim();
     const countryName = document.getElementById('cap-country').value.trim();
