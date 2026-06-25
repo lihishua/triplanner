@@ -666,7 +666,10 @@ function openCountry(id) {
     ${hts.map(h => `
       <div class="place-item" data-id="${h.id}">
         <span class="place-item-name" onclick="openHotel('${h.id}')" style="flex:2">${esc(h.name)}</span>
-        <span class="pill ${h.booked ? 'flight-booked' : 'flight-option'}">${h.booked ? '✓ Booked' : 'Liked'}</span>
+        <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" ${h.booked ? 'checked' : ''} onchange="toggleHotelBooked('${h.id}')">
+          <span style="font-size:13px;color:var(--ink-soft)">Booked</span>
+        </label>
         ${h.price ? `<span class="pill">${esc(h.price)}</span>` : ''}
         ${h.link ? `<a href="${esc(h.link)}" target="_blank" style="text-decoration:none;font-size:15px">🔗</a>` : ''}
         <button class="del" style="position:static;opacity:.35;font-size:17px;margin-left:2px"
@@ -771,7 +774,6 @@ function openAddHotel(countryId) {
   document.getElementById('hotel-modal-title').textContent = 'Add hotel';
   document.getElementById('h-save-btn').textContent = 'Save hotel';
   ['name','link','price','notes'].forEach(k => document.getElementById('h-'+k).value = '');
-  document.getElementById('h-booked').checked = false;
   openOverlay('ov-hotel');
 }
 
@@ -785,7 +787,6 @@ function openHotel(id) {
   document.getElementById('h-link').value = h.link || '';
   document.getElementById('h-price').value = h.price || '';
   document.getElementById('h-notes').value = h.notes || '';
-  document.getElementById('h-booked').checked = !!h.booked;
   openOverlay('ov-hotel');
 }
 
@@ -798,7 +799,6 @@ async function saveHotel() {
     link: val('h-link').trim() || null,
     price: val('h-price').trim() || null,
     notes: val('h-notes').trim() || null,
-    booked: document.getElementById('h-booked').checked,
   };
 
   if (_editingHotelId) {
@@ -826,6 +826,14 @@ async function deleteHotel(id, countryId) {
   if (GUEST_MODE) { lsDelete('hotels', id); }
   else await sb.from('hotels').delete().eq('id', id);
   openCountry(countryId);
+}
+
+async function toggleHotelBooked(id) {
+  const h = hotels.find(x => x.id === id); if (!h) return;
+  h.booked = !h.booked;
+  if (GUEST_MODE) { lsUpdate('hotels', id, { booked: h.booked }); }
+  else { await sb.from('hotels').update({ booked: h.booked }).eq('id', id); }
+  openCountry(h.country_id);
 }
 
 /* ---------------- WEATHER (Open-Meteo, free) ---------------- */
