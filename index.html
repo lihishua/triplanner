@@ -171,6 +171,9 @@
     border:1px solid var(--line);border-radius:20px;padding:7px 14px;cursor:pointer;flex-shrink:0;white-space:nowrap}
   .prep-tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
   .prep-tab.add{color:var(--accent);border-style:dashed}
+  .prep-tab-wrap{position:relative;display:inline-flex;align-items:center}
+  .prep-tab-del{position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;border:none;background:var(--ink-soft);color:#fff;font-size:11px;line-height:1;cursor:pointer;display:none;align-items:center;justify-content:center;padding:0}
+  .prep-tab-wrap:hover .prep-tab-del{display:flex}
 
   /* TODO LIST */
   .todo-item{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}
@@ -422,7 +425,7 @@
         <div><h2>Prep</h2><p>Things to do before you go.</p></div>
       </div>
       <div id="prepTabBar" class="prep-tab-bar"></div>
-      <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:16px">
+      <div style="display:flex;justify-content:flex-start;gap:8px;margin-bottom:16px">
         <button class="btn ghost" style="width:34px;height:34px;border-radius:50%;padding:0;display:flex;align-items:center;justify-content:center;font-size:16px" title="AI suggest" onclick="suggestTodos()">✦</button>
         <button class="btn" style="width:34px;height:34px;border-radius:50%;padding:0;display:flex;align-items:center;justify-content:center;font-size:20px" title="Add item" onclick="openAddTodo()">＋</button>
       </div>
@@ -635,23 +638,24 @@
 <!-- Manage trips overlay -->
 <div class="overlay" id="ov-trips"><div class="modal">
   <h3>Trips</h3>
-  <div class="sub">Create a new trip or join someone else's</div>
 
-  <label>New trip name</label>
+  <div id="mt-invite-section">
+    <label>Invite someone to this trip</label>
+    <div style="display:flex;gap:8px">
+      <input id="mt-invite-link" readonly style="flex:1;font-size:13px">
+      <button class="btn small" onclick="copyInviteLink()">Copy link</button>
+    </div>
+  </div>
+
+  <div class="setup-divider" style="margin:20px 0">create a new trip</div>
+
+  <label>Trip name</label>
   <input id="mt-new-name" placeholder="Europe 2027">
   <div class="modal-actions" style="margin-top:10px">
     <button class="btn" onclick="doCreateTrip()">Create trip</button>
   </div>
 
-  <div class="setup-divider" style="margin:20px 0">invite someone to this trip</div>
-
-  <label>Invite link</label>
-  <div style="display:flex;gap:8px">
-    <input id="mt-invite-link" readonly style="flex:1;font-size:13px">
-    <button class="btn ghost small" onclick="copyInviteLink()">Copy</button>
-  </div>
-
-  <div class="setup-divider" style="margin:20px 0">or join an existing trip</div>
+  <div class="setup-divider" style="margin:20px 0">join an existing trip</div>
 
   <label>Trip owner's email</label>
   <input id="mt-join-email" type="email" placeholder="friend@example.com">
@@ -662,7 +666,10 @@
   </div>
 
   <div id="trips-modal-msg" style="color:var(--ink-soft);font-size:13px;margin-top:12px;min-height:18px"></div>
-  <div class="modal-actions"><button class="btn ghost" onclick="closeAll()">Close</button></div>
+  <div class="modal-actions" style="justify-content:space-between;margin-top:16px">
+    <button class="btn ghost" style="color:var(--red,#c0392b);border-color:var(--red,#c0392b)" onclick="doLeaveTrip()">Remove trip</button>
+    <button class="btn ghost" onclick="closeAll()">Close</button>
+  </div>
 </div></div>
 
 <!-- Research modal -->

@@ -206,6 +206,7 @@ async function openTripsManager() {
   document.getElementById('mt-join-email').value = '';
   document.getElementById('mt-join-name').value = '';
   tripsModalMsg('');
+  document.getElementById('mt-invite-section').style.display = GUEST_MODE ? 'none' : '';
   document.getElementById('mt-invite-link').value = GUEST_MODE ? '' : 'Loading…';
   openOverlay('ov-trips');
   if (GUEST_MODE) return;
@@ -213,6 +214,28 @@ async function openTripsManager() {
   document.getElementById('mt-invite-link').value = data?.invite_token
     ? `${window.location.origin}${window.location.pathname}?invite=${data.invite_token}`
     : '';
+}
+
+async function doLeaveTrip() {
+  const trip = myTrips.find(t => t.id === TRIP_ID);
+  const name = trip?.name || 'this trip';
+  if (!confirm(`Remove "${name}" from your account?\n\nIt will continue to exist for other contributors.`)) return;
+  if (GUEST_MODE) {
+    localStorage.removeItem('triplanner_guest_mode');
+    localStorage.removeItem('triplanner_last_trip');
+    window.location.reload();
+    return;
+  }
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return;
+  await sb.from('trip_members').delete().eq('trip_id', TRIP_ID).eq('user_id', user.id);
+  myTrips = myTrips.filter(t => t.id !== TRIP_ID);
+  closeAll();
+  if (myTrips.length) {
+    await enterTrip(myTrips[0]);
+  } else {
+    showTripOnboarding();
+  }
 }
 
 async function copyInviteLink() {
@@ -1913,9 +1936,31 @@ function renderPrepTabs() {
   if (!el) return;
   const allTabs = [...PREP_BUILTIN_TABS, ...prepTabs.map(t => ({ id: t.id, name: t.name }))];
   if (!allTabs.find(t => t.id === activePrepTab)) activePrepTab = 'todos';
+  const isCustom = id => !PREP_BUILTIN_TABS.some(t => t.id === id);
   el.innerHTML = allTabs.map(t =>
-    `<button class="prep-tab${t.id === activePrepTab ? ' active' : ''}" onclick="switchPrepTab('${t.id}')">${esc(t.name)}</button>`
+    `<span class="prep-tab-wrap">
+      <button class="prep-tab${t.id === activePrepTab ? ' active' : ''}" onclick="switchPrepTab('${t.id}')">${esc(t.name)}</button>
+      ${isCustom(t.id) ? `<button class="prep-tab-del" onclick="deletePrepTab('${t.id}')" title="Delete tab">×</button>` : ''}
+    </span>`
   ).join('') + `<button class="prep-tab add" onclick="openAddPrepTab()">＋</button>`;
+}
+
+async function deletePrepTab(id) {
+  const tab = prepTabs.find(t => t.id === id);
+  if (!tab) return;
+  if (!confirm(`Delete the "${tab.name}" tab and all its tasks?`)) return;
+  prepTabs = prepTabs.filter(t => t.id !== id);
+  todos = todos.filter(t => (t.category || 'todos') !== id);
+  if (activePrepTab === id) activePrepTab = 'todos';
+  if (GUEST_MODE) {
+    lsDelete('prep_tabs', id);
+    lsSave('todos', lsGet('todos').filter(t => (t.category || 'todos') !== id));
+  } else {
+    await sb.from('prep_tabs').delete().eq('id', id);
+    await sb.from('trip_todos').delete().eq('category', id).eq('trip_id', TRIP_ID);
+  }
+  renderPrepTabs();
+  renderTodos();
 }
 
 function switchPrepTab(id) {
@@ -1951,7 +1996,8 @@ async function savePrepTab() {
 function renderTodos() {
   const el = document.getElementById('todoList');
   if (!el) return;
-  const items = todos.filter(t => (t.category || 'todos') === activePrepTab);
+  const items = todos.filter(t => (t.category || 'todos') === activePrepTab)
+    .sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1));
   if (!items.length) {
     el.innerHTML = '<div class="empty">No tasks yet. Add things you need to do before the trip, or ask AI to suggest some.</div>';
     return;
