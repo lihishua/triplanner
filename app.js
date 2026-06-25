@@ -188,8 +188,11 @@ async function enterTrip(trip) {
 
 function renderTripCarousel() {
   const el = document.getElementById('trip-carousel');
-  if (GUEST_MODE) { el.style.display = 'none'; return; }
   el.style.display = 'flex';
+  if (GUEST_MODE) {
+    el.innerHTML = `<button class="trip-chip add" onclick="doLogout()">＋ Sign in to create or join a trip</button>`;
+    return;
+  }
   el.innerHTML = myTrips.map(t =>
     `<button class="trip-chip${t.id === TRIP_ID ? ' active' : ''}" onclick="switchTrip('${t.id}')">
       ${esc(t.name)}<span class="trip-chip-x" onclick="event.stopPropagation();doLeaveTripById('${t.id}')">×</span>
