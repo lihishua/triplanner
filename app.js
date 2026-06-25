@@ -230,14 +230,26 @@ async function doLeaveTripById(id) {
     window.location.reload();
     return;
   }
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) return;
-  await sb.from('trip_members').delete().eq('trip_id', id).eq('user_id', user.id);
+  const { error } = await sb.rpc('leave_trip', { p_trip_id: id });
+  if (error) { alert(error.message); return; }
   myTrips = myTrips.filter(t => t.id !== id);
   closeAll();
   const next = myTrips.find(t => t.id !== id) || myTrips[0];
   if (next) await enterTrip(next);
   else showTripOnboarding();
+}
+
+async function shareTrip() {
+  if (GUEST_MODE) { alert('Sign in to share a trip.'); return; }
+  const { data } = await sb.from('trips').select('invite_token').eq('id', TRIP_ID).single();
+  if (!data?.invite_token) return;
+  const link = `${window.location.origin}${window.location.pathname}?invite=${data.invite_token}`;
+  try { await navigator.clipboard.writeText(link); }
+  catch { /* fallback: show the link */ }
+  const btn = document.getElementById('share-btn');
+  const orig = btn.innerHTML;
+  btn.textContent = '✓ Link copied!';
+  setTimeout(() => { btn.innerHTML = orig; }, 2500);
 }
 
 async function copyInviteLink() {

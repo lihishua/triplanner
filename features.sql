@@ -79,6 +79,14 @@ alter table prep_tabs enable row level security;
 create policy prep_tabs_all on prep_tabs for all
   using (is_trip_member(trip_id)) with check (is_trip_member(trip_id));
 
+-- Feature 8: Leave / remove a trip from your account
+create or replace function leave_trip(p_trip_id uuid)
+returns void language plpgsql security definer as $$
+begin
+  delete from trip_members where trip_id = p_trip_id and user_id = auth.uid();
+end;
+$$;
+
 -- Feature 7: Hotels linked to a specific city/place
 alter table hotels add column if not exists place_id uuid references places(id) on delete set null;
 
