@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TriPlan — our trip, together</title>
+<title>TriPlan — plan your trip. together.</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
@@ -30,7 +30,7 @@
   .authcard{background:var(--paper);border:1px solid var(--line);border-radius:22px;
     box-shadow:var(--shadow);padding:34px;max-width:380px;width:100%;text-align:center}
   .authcard .dot{width:9px;height:9px;border-radius:50%;background:var(--gold);display:inline-block}
-  .authcard h1{font-family:'Fraunces',serif;font-weight:600;font-size:30px;letter-spacing:-.5px;margin:10px 0 2px}
+  .authcard h1{font-family:'Fraunces',serif;font-weight:600;font-size:30px;letter-spacing:.5px;margin:10px 0 2px;text-transform:uppercase}
   .authcard small{color:var(--ink-soft);font-style:italic}
   .authcard input{width:100%;font-family:'Newsreader',serif;font-size:16px;padding:11px 13px;
     border:1px solid var(--line);border-radius:11px;margin-top:12px;background:#fff}
@@ -42,7 +42,7 @@
   #logout-btn{margin-left:auto;width:34px;height:34px;border-radius:50%;padding:0;
     display:flex;align-items:center;justify-content:center;flex-shrink:0}
   .brand{display:flex;align-items:baseline;gap:12px}
-  .brand h1{font-family:'Fraunces',serif;font-weight:600;font-size:30px;letter-spacing:-.5px;line-height:1}
+  .brand h1{font-family:'Fraunces',serif;font-weight:600;font-size:30px;letter-spacing:.5px;line-height:1;text-transform:uppercase}
   .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--gold);display:inline-block;transform:translateY(-2px)}
   .brand small{color:var(--ink-soft);font-style:italic;font-size:15px}
   .top-actions{display:flex;gap:10px;max-width:100%;margin-top:14px;overflow-x:auto;touch-action:pan-x;
@@ -318,6 +318,7 @@
       <button class="btn ghost" style="flex:1" onclick="doSignup()">Sign up</button>
       <button class="btn" style="flex:1" onclick="doLogin()">Log in</button>
     </div>
+    <button class="btn ghost small" style="width:100%;margin-top:8px;color:var(--ink-soft)" onclick="doForgotPassword()">Forgot password?</button>
     <div id="au-msg"></div>
     <div style="margin-top:18px;border-top:1px solid var(--line);padding-top:16px">
       <button class="btn ghost" style="width:100%;color:var(--ink-soft)" onclick="enterAsGuest()">Continue as guest</button>
@@ -570,6 +571,21 @@
   <label>Notes</label><textarea id="h-notes" rows="2"></textarea>
   <div class="modal-actions"><button class="btn ghost" onclick="closeAll()">Cancel</button>
     <button id="h-save-btn" class="btn" onclick="saveHotel()">Save hotel</button></div>
+</div></div>
+
+<!-- Set new password modal (shown after following a "forgot password" email link) -->
+<div class="overlay" id="ov-reset-pass"><div class="modal">
+  <h3>Set a new password</h3>
+  <div class="sub">You followed a password reset link — choose a new password.</div>
+  <label>New password</label>
+  <input id="rp-password" type="password" autocomplete="new-password">
+  <label>Confirm new password</label>
+  <input id="rp-confirm" type="password" autocomplete="new-password">
+  <div id="rp-msg" style="color:var(--ink-soft);font-size:13px;margin-top:6px;min-height:18px"></div>
+  <div class="modal-actions">
+    <button class="btn ghost" onclick="skipPasswordReset()">Skip for now</button>
+    <button class="btn" onclick="doSetNewPassword()">Set password</button>
+  </div>
 </div></div>
 
 <!-- Expense + target modals -->

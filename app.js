@@ -39,16 +39,23 @@ function lsUpdate(table, id, data) {
 function lsDelete(table, id) { lsSave(table, lsGet(table).filter(r => r.id !== id)); }
 
 /* ---------------- AUTH ---------------- */
+let _passwordRecoveryPending = window.location.hash.includes('type=recovery');
+
 async function init() {
-  if (localStorage.getItem('triplanner_guest_mode') === '1') {
+  if (localStorage.getItem('triplanner_guest_mode') === '1' && !_passwordRecoveryPending) {
     enterAsGuest(false);
     return;
   }
   try {
     const { data: { session } } = await sb.auth.getSession();
-    if (session) onLoggedIn();
+    if (_passwordRecoveryPending) { showAuth(); openOverlay('ov-reset-pass'); }
+    else if (session) onLoggedIn();
     else showAuth();
-    sb.auth.onAuthStateChange((_e, s) => { if (s) onLoggedIn(); else showAuth(); });
+    sb.auth.onAuthStateChange((e, s) => {
+      if (e === 'PASSWORD_RECOVERY') { _passwordRecoveryPending = true; showAuth(); openOverlay('ov-reset-pass'); return; }
+      if (_passwordRecoveryPending) return;
+      if (s) onLoggedIn(); else showAuth();
+    });
   } catch (e) {
     showAuth();
   }
@@ -83,6 +90,34 @@ async function doSignup() {
   if (error) return authMsg(error.message);
   authMsg("Account created. If email confirmation is on, confirm then log in. "
         + "Remember: an admin must add you to the shared trip once (see schema.sql).");
+}
+async function doForgotPassword() {
+  const email = val('au-email').trim();
+  if (!email) return authMsg('Enter your email above, then tap "Forgot password?" again.');
+  authMsg('Sending reset link…');
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + window.location.pathname,
+  });
+  authMsg(error ? error.message : 'Check your email for a password reset link.');
+}
+function rpMsg(m) { document.getElementById('rp-msg').textContent = m; }
+async function doSetNewPassword() {
+  const pw = val('rp-password'), pw2 = val('rp-confirm');
+  if (!pw || pw.length < 6) return rpMsg('Password must be at least 6 characters.');
+  if (pw !== pw2) return rpMsg('Passwords do not match.');
+  rpMsg('Saving…');
+  const { error } = await sb.auth.updateUser({ password: pw });
+  if (error) return rpMsg(error.message);
+  _passwordRecoveryPending = false;
+  history.replaceState(null, '', window.location.pathname + window.location.search);
+  closeAll();
+  await onLoggedIn();
+}
+function skipPasswordReset() {
+  _passwordRecoveryPending = false;
+  history.replaceState(null, '', window.location.pathname + window.location.search);
+  closeAll();
+  onLoggedIn();
 }
 async function doLogout() {
   if (GUEST_MODE) {
