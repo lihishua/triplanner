@@ -191,7 +191,10 @@ function renderTripCarousel() {
   if (GUEST_MODE) { el.style.display = 'none'; return; }
   el.style.display = 'flex';
   el.innerHTML = myTrips.map(t =>
-    `<button class="trip-chip${t.id === TRIP_ID ? ' active' : ''}" onclick="switchTrip('${t.id}')">${esc(t.name)}</button>`
+    `<span class="trip-chip-wrap">
+      <button class="trip-chip${t.id === TRIP_ID ? ' active' : ''}" onclick="switchTrip('${t.id}')">${esc(t.name)}</button>
+      <button class="trip-chip-del" onclick="doLeaveTripById('${t.id}')" title="Remove trip">×</button>
+    </span>`
   ).join('') + `<button class="trip-chip add" onclick="openTripsManager()">＋ New trip</button>`;
 }
 
@@ -216,8 +219,10 @@ async function openTripsManager() {
     : '';
 }
 
-async function doLeaveTrip() {
-  const trip = myTrips.find(t => t.id === TRIP_ID);
+async function doLeaveTrip() { await doLeaveTripById(TRIP_ID); }
+
+async function doLeaveTripById(id) {
+  const trip = myTrips.find(t => t.id === id);
   const name = trip?.name || 'this trip';
   if (!confirm(`Remove "${name}" from your account?\n\nIt will continue to exist for other contributors.`)) return;
   if (GUEST_MODE) {
@@ -228,14 +233,12 @@ async function doLeaveTrip() {
   }
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return;
-  await sb.from('trip_members').delete().eq('trip_id', TRIP_ID).eq('user_id', user.id);
-  myTrips = myTrips.filter(t => t.id !== TRIP_ID);
+  await sb.from('trip_members').delete().eq('trip_id', id).eq('user_id', user.id);
+  myTrips = myTrips.filter(t => t.id !== id);
   closeAll();
-  if (myTrips.length) {
-    await enterTrip(myTrips[0]);
-  } else {
-    showTripOnboarding();
-  }
+  const next = myTrips.find(t => t.id !== id) || myTrips[0];
+  if (next) await enterTrip(next);
+  else showTripOnboarding();
 }
 
 async function copyInviteLink() {

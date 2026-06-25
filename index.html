@@ -172,8 +172,8 @@
   .prep-tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
   .prep-tab.add{color:var(--accent);border-style:dashed}
   .prep-tab-wrap{position:relative;display:inline-flex;align-items:center}
-  .prep-tab-del{position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;border:none;background:var(--ink-soft);color:#fff;font-size:11px;line-height:1;cursor:pointer;display:none;align-items:center;justify-content:center;padding:0}
-  .prep-tab-wrap:hover .prep-tab-del{display:flex}
+  .prep-tab-del{position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;border:none;background:var(--ink-soft);color:#fff;font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;opacity:.7}
+  .prep-tab-del:hover{opacity:1;background:var(--red,#c0392b)}
 
   /* TODO LIST */
   .todo-item{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}
@@ -299,6 +299,9 @@
   /* TRIP CAROUSEL */
   .trip-carousel{display:flex;gap:8px;padding:14px 0 2px;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
   .trip-carousel::-webkit-scrollbar{display:none}
+  .trip-chip-wrap{position:relative;display:inline-flex;flex-shrink:0}
+  .trip-chip-del{position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;border:none;background:var(--ink-soft);color:#fff;font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;opacity:.7;z-index:1}
+  .trip-chip-del:hover{opacity:1;background:var(--red,#c0392b)}
   .trip-chip{flex-shrink:0;font-family:'Fraunces',serif;font-size:14px;padding:7px 18px;
     border-radius:20px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);
     cursor:pointer;white-space:nowrap;transition:all .15s}
