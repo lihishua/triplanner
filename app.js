@@ -191,10 +191,9 @@ function renderTripCarousel() {
   if (GUEST_MODE) { el.style.display = 'none'; return; }
   el.style.display = 'flex';
   el.innerHTML = myTrips.map(t =>
-    `<span class="trip-chip-wrap">
-      <button class="trip-chip${t.id === TRIP_ID ? ' active' : ''}" onclick="switchTrip('${t.id}')">${esc(t.name)}</button>
-      <button class="trip-chip-del" onclick="doLeaveTripById('${t.id}')" title="Remove trip">×</button>
-    </span>`
+    `<button class="trip-chip${t.id === TRIP_ID ? ' active' : ''}" onclick="switchTrip('${t.id}')">
+      ${esc(t.name)}<span class="trip-chip-x" onclick="event.stopPropagation();doLeaveTripById('${t.id}')">×</span>
+    </button>`
   ).join('') + `<button class="trip-chip add" onclick="openTripsManager()">＋ New trip</button>`;
 }
 
@@ -1939,29 +1938,36 @@ function renderPrepTabs() {
   if (!el) return;
   const allTabs = [...PREP_BUILTIN_TABS, ...prepTabs.map(t => ({ id: t.id, name: t.name }))];
   if (!allTabs.find(t => t.id === activePrepTab)) activePrepTab = 'todos';
-  const isCustom = id => !PREP_BUILTIN_TABS.some(t => t.id === id);
   el.innerHTML = allTabs.map(t =>
-    `<span class="prep-tab-wrap">
-      <button class="prep-tab${t.id === activePrepTab ? ' active' : ''}" onclick="switchPrepTab('${t.id}')">${esc(t.name)}</button>
-      ${isCustom(t.id) ? `<button class="prep-tab-del" onclick="deletePrepTab('${t.id}')" title="Delete tab">×</button>` : ''}
-    </span>`
+    `<button class="prep-tab${t.id === activePrepTab ? ' active' : ''}" onclick="switchPrepTab('${t.id}')">
+      ${esc(t.name)}<span class="prep-tab-x" onclick="event.stopPropagation();deletePrepTab('${t.id}')">×</span>
+    </button>`
   ).join('') + `<button class="prep-tab add" onclick="openAddPrepTab()">＋</button>`;
 }
 
 async function deletePrepTab(id) {
-  const tab = prepTabs.find(t => t.id === id);
-  if (!tab) return;
-  if (!confirm(`Delete the "${tab.name}" tab and all its tasks?`)) return;
-  prepTabs = prepTabs.filter(t => t.id !== id);
+  const builtin = PREP_BUILTIN_TABS.find(t => t.id === id);
+  const custom  = prepTabs.find(t => t.id === id);
+  const tabName = builtin?.name || custom?.name || id;
+  const msg = builtin
+    ? `Clear all tasks in "${tabName}"?`
+    : `Delete the "${tabName}" tab and all its tasks?`;
+  if (!confirm(msg)) return;
+
   todos = todos.filter(t => (t.category || 'todos') !== id);
-  if (activePrepTab === id) activePrepTab = 'todos';
   if (GUEST_MODE) {
-    lsDelete('prep_tabs', id);
     lsSave('todos', lsGet('todos').filter(t => (t.category || 'todos') !== id));
   } else {
-    await sb.from('prep_tabs').delete().eq('id', id);
     await sb.from('trip_todos').delete().eq('category', id).eq('trip_id', TRIP_ID);
   }
+
+  if (custom) {
+    prepTabs = prepTabs.filter(t => t.id !== id);
+    if (!GUEST_MODE) await sb.from('prep_tabs').delete().eq('id', id);
+    else lsDelete('prep_tabs', id);
+  }
+
+  if (activePrepTab === id) activePrepTab = 'todos';
   renderPrepTabs();
   renderTodos();
 }
