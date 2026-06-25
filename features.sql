@@ -78,3 +78,20 @@ create table if not exists prep_tabs (
 alter table prep_tabs enable row level security;
 create policy prep_tabs_all on prep_tabs for all
   using (is_trip_member(trip_id)) with check (is_trip_member(trip_id));
+
+-- Feature 6: Shareable invite link to join a trip (alongside email+trip-name join)
+alter table trips add column if not exists invite_token uuid not null default gen_random_uuid();
+
+create or replace function join_trip_by_token(p_token uuid)
+returns uuid language plpgsql security definer as $$
+declare v_trip_id uuid;
+begin
+  select id into v_trip_id from trips where invite_token = p_token;
+  if v_trip_id is null then
+    raise exception 'Invalid or expired invite link.';
+  end if;
+  insert into trip_members(trip_id, user_id) values (v_trip_id, auth.uid())
+  on conflict do nothing;
+  return v_trip_id;
+end;
+$$;

@@ -633,6 +633,14 @@
     <button class="btn" onclick="doCreateTrip()">Create trip</button>
   </div>
 
+  <div class="setup-divider" style="margin:20px 0">invite someone to this trip</div>
+
+  <label>Invite link</label>
+  <div style="display:flex;gap:8px">
+    <input id="mt-invite-link" readonly style="flex:1;font-size:13px">
+    <button class="btn ghost small" onclick="copyInviteLink()">Copy</button>
+  </div>
+
   <div class="setup-divider" style="margin:20px 0">or join an existing trip</div>
 
   <label>Trip owner's email</label>

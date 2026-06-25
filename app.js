@@ -40,9 +40,10 @@ function lsDelete(table, id) { lsSave(table, lsGet(table).filter(r => r.id !== i
 
 /* ---------------- AUTH ---------------- */
 let _passwordRecoveryPending = window.location.hash.includes('type=recovery');
+let _pendingInviteToken = new URLSearchParams(window.location.search).get('invite');
 
 async function init() {
-  if (localStorage.getItem('triplanner_guest_mode') === '1' && !_passwordRecoveryPending) {
+  if (localStorage.getItem('triplanner_guest_mode') === '1' && !_passwordRecoveryPending && !_pendingInviteToken) {
     enterAsGuest(false);
     return;
   }
@@ -140,6 +141,21 @@ async function onLoggedIn() {
   GUEST_MODE = false;
   document.getElementById('auth').style.display = 'none';
 
+  if (_pendingInviteToken) {
+    const token = _pendingInviteToken;
+    _pendingInviteToken = null;
+    history.replaceState(null, '', window.location.pathname + window.location.hash);
+    const { data: tripId, error: joinError } = await sb.rpc('join_trip_by_token', { p_token: token });
+    if (joinError) alert(joinError.message);
+    else if (tripId) {
+      const { data: trips } = await sb.from('trips').select('id, name').order('created_at', { ascending: true });
+      myTrips = trips || [];
+      const joined = myTrips.find(t => t.id === tripId) || { id: tripId, name: 'Shared trip' };
+      await enterTrip(joined);
+      return;
+    }
+  }
+
   const { data, error } = await sb.from('trips').select('id, name').order('created_at', { ascending: true });
   if (error) { authMsg(error.message); showAuth(); return; }
   myTrips = data || [];
@@ -185,12 +201,26 @@ async function switchTrip(id) {
   await enterTrip(trip);
 }
 
-function openTripsManager() {
+async function openTripsManager() {
   document.getElementById('mt-new-name').value = '';
   document.getElementById('mt-join-email').value = '';
   document.getElementById('mt-join-name').value = '';
   tripsModalMsg('');
+  document.getElementById('mt-invite-link').value = GUEST_MODE ? '' : 'Loading…';
   openOverlay('ov-trips');
+  if (GUEST_MODE) return;
+  const { data } = await sb.from('trips').select('invite_token').eq('id', TRIP_ID).single();
+  document.getElementById('mt-invite-link').value = data?.invite_token
+    ? `${window.location.origin}${window.location.pathname}?invite=${data.invite_token}`
+    : '';
+}
+
+async function copyInviteLink() {
+  const el = document.getElementById('mt-invite-link');
+  if (!el.value) return;
+  try { await navigator.clipboard.writeText(el.value); }
+  catch { el.select(); document.execCommand('copy'); }
+  tripsModalMsg('Link copied!');
 }
 
 async function doCreateTrip() {
