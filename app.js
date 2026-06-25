@@ -1852,7 +1852,12 @@ let _editingTodoId = null;
 
 function openAddTodo() {
   _editingTodoId = null;
-  document.querySelector('#ov-todo h3').textContent = 'Add task';
+  const isBuiltin = PREP_BUILTIN_TABS.some(t => t.id === activePrepTab);
+  const isNoDate = activePrepTab === 'first_aid' || activePrepTab === 'shopping';
+  const title = activePrepTab === 'todos' ? 'Add todo' : 'Add item';
+  document.getElementById('todo-modal-title').textContent = title;
+  document.getElementById('todo-label').textContent = activePrepTab === 'todos' ? 'Task' : 'Item';
+  document.getElementById('todo-deadline-row').style.display = isNoDate ? 'none' : '';
   document.getElementById('todo-title').value = '';
   document.getElementById('todo-deadline').value = '';
   openOverlay('ov-todo');
@@ -1861,7 +1866,10 @@ function openAddTodo() {
 function openEditTodo(id) {
   const t = todos.find(x => x.id === id); if (!t) return;
   _editingTodoId = id;
-  document.querySelector('#ov-todo h3').textContent = 'Edit task';
+  const isNoDate = activePrepTab === 'first_aid' || activePrepTab === 'shopping';
+  document.getElementById('todo-modal-title').textContent = activePrepTab === 'todos' ? 'Edit todo' : 'Edit item';
+  document.getElementById('todo-label').textContent = activePrepTab === 'todos' ? 'Task' : 'Item';
+  document.getElementById('todo-deadline-row').style.display = isNoDate ? 'none' : '';
   document.getElementById('todo-title').value = t.title;
   document.getElementById('todo-deadline').value = t.deadline || '';
   openOverlay('ov-todo');
