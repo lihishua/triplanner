@@ -515,9 +515,16 @@
 
 <!-- Capture modal -->
 <div class="overlay" id="ov-capture"><div class="modal">
-  <h3>Capture a place</h3>
-  <label>Place</label>
-  <input id="cap-place" placeholder="Hoi An" oninput="onPlaceInput()" autocomplete="off">
+  <h3 id="cap-title">Capture a place</h3>
+  <label id="cap-place-label">Place</label>
+  <div class="airport-wrap">
+    <input id="cap-place" placeholder="Hoi An" oninput="onPlaceInput()" autocomplete="off">
+    <div id="cap-place-drop" class="airport-dropdown"></div>
+  </div>
+  <div id="cap-city-row" style="display:none">
+    <label>City</label>
+    <input id="cap-city" placeholder="city where it is" autocomplete="off">
+  </div>
   <label style="display:flex;align-items:center;gap:6px">
     Country
     <span id="cap-country-status" style="font-family:'Newsreader',serif;font-weight:400;font-style:italic;color:var(--ink-soft);font-size:13px"></span>
@@ -526,6 +533,7 @@
   <div id="cap-country-suggestions"></div>
   <label>Link <span id="cap-url-status" style="font-family:'Newsreader',serif;font-weight:400;font-style:italic;color:var(--accent);font-size:13px"></span></label>
   <input id="cap-url" placeholder="paste Instagram, TikTok, YouTube or any link…" oninput="onUrlInput()">
+  <div id="cap-type-hint" style="display:none;font-size:13px;color:var(--ink-soft);margin-bottom:4px"></div>
   <div id="cap-msg"></div>
   <div class="modal-actions">
     <button class="btn ghost" onclick="closeAll()">Cancel</button>

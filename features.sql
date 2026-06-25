@@ -79,6 +79,9 @@ alter table prep_tabs enable row level security;
 create policy prep_tabs_all on prep_tabs for all
   using (is_trip_member(trip_id)) with check (is_trip_member(trip_id));
 
+-- Feature 7: Hotels linked to a specific city/place
+alter table hotels add column if not exists place_id uuid references places(id) on delete set null;
+
 -- Feature 6: Shareable invite link to join a trip (alongside email+trip-name join)
 alter table trips add column if not exists invite_token uuid not null default gen_random_uuid();
 

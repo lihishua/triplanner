@@ -58,18 +58,22 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 120,
+        max_tokens: 180,
         messages: [{
           role: "user",
           content: `From this webpage content, identify the travel destination. Return ONLY a JSON object, no other text:
-{"place": "specific city/place name or null", "country": "country name or null"}
+{"name": "hotel/Airbnb/restaurant/attraction name if this is a specific listing, otherwise null", "place": "city or destination name or null", "country": "country name or null", "type": "hotel if this is a hotel or accommodation listing, place if it is a travel content page, null if unclear"}
 
 Content:
 ${pageText.slice(0, 800)}
 
 URL: ${url}
 
-If no clear travel destination is mentioned, return {"place": null, "country": null}.`,
+Examples:
+- Booking.com hotel page → {"name": "Hotel Le Marais", "place": "Paris", "country": "France", "type": "hotel"}
+- Airbnb listing → {"name": "Oceanfront Villa", "place": "Bali", "country": "Indonesia", "type": "hotel"}
+- Instagram post about Hoi An → {"name": null, "place": "Hoi An", "country": "Vietnam", "type": "place"}
+If nothing clear, return {"name": null, "place": null, "country": null, "type": null}.`,
         }],
       }),
     });
@@ -77,13 +81,13 @@ If no clear travel destination is mentioned, return {"place": null, "country": n
     const data = await r.json();
     const raw = (data.content || []).map((b: any) => b.text).join("").trim();
 
-    let place = null, country = null;
+    let name = null, place = null, country = null, type = null;
     try {
       const match = raw.match(/\{[\s\S]*\}/);
-      if (match) ({ place, country } = JSON.parse(match[0]));
+      if (match) ({ name, place, country, type } = JSON.parse(match[0]));
     } catch (_) {}
 
-    return json({ place, country });
+    return json({ name, place, country, type });
   } catch (e) {
     return json({ error: String(e) }, 500);
   }

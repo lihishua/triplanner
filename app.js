@@ -322,6 +322,23 @@ async function ensureCountry(name, flag) {
   return data;
 }
 
+async function ensurePlace(cityName, countryId) {
+  const found = places.find(p => p.name.toLowerCase() === cityName.toLowerCase() && p.country_id === countryId);
+  if (found) return found;
+  const country = countries.find(c => c.id === countryId);
+  const geo = await geocode(cityName + (country ? ', ' + country.name : ''));
+  const row = { trip_id: TRIP_ID, country_id: countryId, name: cap(cityName), lat: geo.lat, lng: geo.lng, source_url: null };
+  if (GUEST_MODE) {
+    const newPlace = lsInsert('places', row);
+    places.push(newPlace);
+    return newPlace;
+  }
+  const { data, error } = await sb.from('places').insert(row).select().single();
+  if (error) return null;
+  places.push(data);
+  return data;
+}
+
 /* geocode a city name via OpenStreetMap Nominatim (free, no key) */
 async function geocode(q) {
   try {
@@ -336,12 +353,51 @@ async function geocode(q) {
 /* ---------------- CAPTURE (place → auto-detect country) ---------------- */
 let _placeDebounce = null;
 let _urlDebounce   = null;
+let _capType       = 'place'; // 'place' | 'hotel' | 'flight'
+
+const HOTEL_URL_PATTERNS  = ['booking.com/hotel','airbnb.com/room','airbnb.com/h/','hotels.com','hostelworld.com','agoda.com/','trivago.com','marriott.com','hilton.com','hyatt.com','ihg.com','radisson.com','accorhotels.com'];
+const FLIGHT_URL_PATTERNS = ['skyscanner.','kayak.com/flight','google.com/travel/flights','expedia.com/flight','momondo.','kiwi.com','flightaware.','ryanair.com','easyjet.com','wizzair.','airasia.com/flight'];
+
+function detectUrlType(url) {
+  const u = url.toLowerCase();
+  if (FLIGHT_URL_PATTERNS.some(p => u.includes(p))) return 'flight';
+  if (HOTEL_URL_PATTERNS.some(p => u.includes(p))) return 'hotel';
+  return 'place';
+}
+
+function setCaptureMode(type) {
+  _capType = type;
+  const title = document.getElementById('cap-title');
+  const label = document.getElementById('cap-place-label');
+  const cityRow = document.getElementById('cap-city-row');
+  const hint = document.getElementById('cap-type-hint');
+  if (type === 'hotel') {
+    title.textContent = 'Add hotel';
+    label.textContent = 'Hotel name';
+    cityRow.style.display = '';
+    hint.textContent = '🏨 Hotel link — will save to your hotels';
+    hint.style.display = 'block';
+  } else if (type === 'flight') {
+    title.textContent = 'Capture a place';
+    label.textContent = 'Place';
+    cityRow.style.display = 'none';
+    hint.textContent = '✈ Flight link — tap "File it" to open the flights form';
+    hint.style.display = 'block';
+  } else {
+    title.textContent = 'Capture a place';
+    label.textContent = 'Place';
+    cityRow.style.display = 'none';
+    hint.style.display = 'none';
+  }
+}
 
 function onUrlInput() {
   clearTimeout(_urlDebounce);
   const url = document.getElementById('cap-url').value.trim();
-  if (!url.startsWith('http')) return;
-  // Only trigger if place is still empty
+  if (!url.startsWith('http')) { setCaptureMode('place'); return; }
+  const detected = detectUrlType(url);
+  setCaptureMode(detected);
+  if (detected === 'flight') return; // no parse needed for flights
   if (document.getElementById('cap-place').value.trim()) return;
   document.getElementById('cap-url-status').textContent = 'extracting…';
   _urlDebounce = setTimeout(() => parseLink(url), 800);
@@ -352,20 +408,29 @@ async function parseLink(url) {
   if (GUEST_MODE) { statusEl.textContent = ''; return; }
   try {
     const { data, error } = await sb.functions.invoke('parse-link', { body: { url } });
-    if (error) { statusEl.textContent = '⚠ type place manually'; return; }
+    if (error) { statusEl.textContent = '⚠ type manually'; return; }
 
-    const place   = data?.place;
-    const country = data?.country;
+    const { name, place, country, type } = data || {};
 
-    if (!place && !country) {
-      statusEl.textContent = '⚠ type place below';
+    // Upgrade to hotel mode if parse-link detected a hotel listing
+    if (type === 'hotel' && _capType !== 'hotel') setCaptureMode('hotel');
+
+    if (!name && !place && !country) {
+      statusEl.textContent = '⚠ type below';
       document.getElementById('cap-place').focus();
       setTimeout(() => { statusEl.textContent = ''; }, 3000);
       return;
     }
 
-    if (place && !document.getElementById('cap-place').value.trim())
-      document.getElementById('cap-place').value = place;
+    if (_capType === 'hotel') {
+      if (name && !document.getElementById('cap-place').value.trim())
+        document.getElementById('cap-place').value = name;
+      if (place && !document.getElementById('cap-city').value.trim())
+        document.getElementById('cap-city').value = place;
+    } else {
+      if (place && !document.getElementById('cap-place').value.trim())
+        document.getElementById('cap-place').value = place;
+    }
     if (country && !document.getElementById('cap-country').value.trim()) {
       document.getElementById('cap-country').value = country;
       document.getElementById('cap-country-suggestions').innerHTML = '';
@@ -373,7 +438,7 @@ async function parseLink(url) {
     statusEl.textContent = '✓ extracted';
     setTimeout(() => { statusEl.textContent = ''; }, 2500);
   } catch (e) {
-    statusEl.textContent = '⚠ type place manually';
+    statusEl.textContent = '⚠ type manually';
     setTimeout(() => { statusEl.textContent = ''; }, 3000);
   }
 }
@@ -392,36 +457,39 @@ async function autoDetectCountry(place) {
       + encodeURIComponent(place) + '&addressdetails=1');
     const results = await r.json();
     document.getElementById('cap-country-status').textContent = '';
-    if (!results.length) return;
+    document.getElementById('cap-country-suggestions').innerHTML = '';
+    const drop = document.getElementById('cap-place-drop');
+    if (!results.length) { drop.classList.remove('open'); return; }
 
-    // Show place name suggestions (helps with spelling)
-    const placeSuggestions = results.slice(0, 4).map(res => {
+    // Show suggestions in dropdown on the place input
+    drop.innerHTML = results.slice(0, 5).map(res => {
       const name    = res.name || res.display_name.split(',')[0];
       const country = res.address?.country || '';
       const state   = res.address?.state || res.address?.county || '';
-      const label   = [name, state, country].filter(Boolean).join(', ');
-      return { name, country, label };
-    });
+      const sub     = [state, country].filter(Boolean).join(', ');
+      return `<div class="airport-opt" onclick="pickCapPlace('${esc(name)}','${esc(country)}')">
+        <span class="airport-iata">${FLAGS[country.toLowerCase()]||'🌍'}</span>
+        <span class="airport-info">${esc(name)}${sub ? ' · '+esc(sub) : ''}</span>
+      </div>`;
+    }).join('');
+    drop.classList.add('open');
 
-    const seenCountries = new Set();
-    const countries = results.map(r => r.address?.country).filter(c => c && !seenCountries.has(c) && seenCountries.add(c));
-
-    // If only 1 country, auto-fill country; show place suggestions
-    if (countries.length === 1) {
-      document.getElementById('cap-country').value = countries[0];
-    }
-
-    // Show place suggestions as clickable chips
-    document.getElementById('cap-country-suggestions').innerHTML =
-      placeSuggestions.map(p =>
-        `<button class="suggestion-chip" onclick="pickPlace('${esc(p.name)}','${esc(p.country)}')">${FLAGS[p.country.toLowerCase()]||'🌍'} ${esc(p.label)}</button>`
-      ).join('') +
-      (countries.length > 1
-        ? countries.map(c => `<button class="suggestion-chip" onclick="pickCountry('${esc(c)}')">${FLAGS[c.toLowerCase()]||'🌍'} ${esc(c)}</button>`).join('')
-        : '');
+    // Auto-fill country if unambiguous
+    const seen = new Set();
+    const countryList = results.map(r => r.address?.country).filter(c => c && !seen.has(c) && seen.add(c));
+    if (countryList.length === 1 && !document.getElementById('cap-country').value.trim())
+      document.getElementById('cap-country').value = countryList[0];
   } catch (e) {
     document.getElementById('cap-country-status').textContent = '';
   }
+}
+
+function pickCapPlace(name, country) {
+  document.getElementById('cap-place').value = name;
+  if (country) document.getElementById('cap-country').value = country;
+  document.getElementById('cap-place-drop').classList.remove('open');
+  document.getElementById('cap-country-suggestions').innerHTML = '';
+  document.getElementById('cap-country-status').textContent = '';
 }
 
 function pickPlace(name, country) {
@@ -436,13 +504,44 @@ function pickCountry(name) {
 }
 
 async function runCapture() {
+  const url = val('cap-url').trim();
+
+  // Flight → open flight form
+  if (_capType === 'flight') {
+    closeAll();
+    openFlight();
+    if (url) document.getElementById('f-notes').value = url;
+    return;
+  }
+
+  // Hotel → save to hotels section
+  if (_capType === 'hotel') {
+    const hotelName   = document.getElementById('cap-place').value.trim();
+    const cityInput   = document.getElementById('cap-city').value.trim();
+    const countryName = document.getElementById('cap-country').value.trim();
+    const effectiveCountry = countryName || cityInput;
+    if (!effectiveCountry) return capMsg('Enter the country or city.');
+    capMsg('Saving hotel…');
+    const country = await ensureCountry(cap(effectiveCountry), FLAGS[effectiveCountry.toLowerCase()] || '🌍');
+    if (!country) return;
+    let place = null;
+    if (cityInput) place = await ensurePlace(cityInput, country.id);
+    const row = { trip_id: TRIP_ID, country_id: country.id, place_id: place?.id || null,
+      name: cap(hotelName) || 'Untitled hotel', link: url || null, booked: false };
+    if (GUEST_MODE) { lsInsert('hotels', row); }
+    else {
+      const { error } = await sb.from('hotels').insert(row);
+      if (error) return capMsg(error.message);
+    }
+    closeAll(); await refreshAll();
+    return;
+  }
+
+  // Place / country
   const cityName    = document.getElementById('cap-place').value.trim();
   const countryName = document.getElementById('cap-country').value.trim();
-  const url         = val('cap-url').trim();
-
   if (!cityName && !countryName) return capMsg('Enter a place or country name.');
 
-  // Country-only: Place is empty, or Place matches Country
   const isCountryOnly = !cityName || (countryName && cityName.toLowerCase() === countryName.toLowerCase());
   const effectiveCountry = countryName || cityName;
 
@@ -808,6 +907,7 @@ async function openCity(id) {
   const country = countries.find(co => co.id === c.country_id);
   document.getElementById('detailTitle').textContent = '📍 ' + c.name;
   const body = document.getElementById('detailBody');
+  const cityHotels = hotels.filter(h => h.place_id === id);
   body.innerHTML = `
     <div id="wx" class="wx">Loading weather…</div>
     ${c.source_url ? `<a class="srclink" href="${esc(c.source_url)}" target="_blank">↗ open saved link</a>` : ''}
@@ -823,6 +923,23 @@ async function openCity(id) {
         <button class="btn small" onclick="investigate('${c.id}')">✦ Investigate with AI</button>
       </div>
       <div id="ai-out" class="ai-out">${c.ai_notes ? esc(c.ai_notes) : 'Tap "Investigate with AI" for a kid-friendly briefing.'}</div>
+    </div>
+    <div class="places-header" style="margin-top:24px">Hotels</div>
+    ${cityHotels.map(h => `
+      <div class="place-item" data-id="${h.id}">
+        <span class="place-item-name" onclick="openHotel('${h.id}')" style="flex:2">${esc(h.name)}</span>
+        <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" ${h.booked ? 'checked' : ''} onchange="toggleHotelBooked('${h.id}')">
+          <span style="font-size:13px;color:var(--ink-soft)">Booked</span>
+        </label>
+        ${h.price ? `<span class="pill">${esc(h.price)}</span>` : ''}
+        ${h.link ? `<a href="${esc(h.link)}" target="_blank" style="text-decoration:none;font-size:15px">🔗</a>` : ''}
+        <button class="del" style="position:static;opacity:.35;font-size:17px;margin-left:2px"
+          onclick="deleteHotel('${h.id}','${c.country_id}')">×</button>
+      </div>`).join('')}
+    ${!cityHotels.length ? '<div class="empty" style="margin:8px 0 12px">No hotels yet.</div>' : ''}
+    <div class="add-place-row">
+      <button class="btn small" onclick="openAddHotel('${c.country_id}','${c.id}')">＋ Add hotel</button>
     </div>`;
   openOverlay('ov-detail');
   if (c.lat && c.lng) loadWeather(c.lat, c.lng);
@@ -832,10 +949,12 @@ async function openCity(id) {
 /* ---------------- HOTELS ---------------- */
 let _editingHotelId = null;
 let _hotelCountryId = null;
+let _hotelPlaceId   = null;
 
-function openAddHotel(countryId) {
+function openAddHotel(countryId, placeId = null) {
   _editingHotelId = null;
   _hotelCountryId = countryId;
+  _hotelPlaceId   = placeId;
   document.getElementById('hotel-modal-title').textContent = 'Add hotel';
   document.getElementById('h-save-btn').textContent = 'Save hotel';
   ['name','link','price','notes'].forEach(k => document.getElementById('h-'+k).value = '');
@@ -876,7 +995,7 @@ async function saveHotel() {
     if (GUEST_MODE) { lsUpdate('hotels', _editingHotelId, fields); }
     else { await sb.from('hotels').update(fields).eq('id', _editingHotelId); }
   } else {
-    const row = { ...fields, trip_id: TRIP_ID, country_id: countryId };
+    const row = { ...fields, trip_id: TRIP_ID, country_id: countryId, place_id: _hotelPlaceId || null };
     if (GUEST_MODE) {
       hotels.push(lsInsert('hotels', row));
     } else {
@@ -886,8 +1005,11 @@ async function saveHotel() {
     }
   }
   _editingHotelId = null;
+  const placeId = _hotelPlaceId;
+  _hotelPlaceId = null;
   closeAll();
-  openCountry(countryId);
+  if (placeId) openCity(placeId);
+  else openCountry(countryId);
 }
 
 async function deleteHotel(id, countryId) {
@@ -1263,10 +1385,13 @@ function showTab(t){
 function openOverlay(id){ document.getElementById(id).classList.add('show'); }
 function openCapture(){
   document.getElementById('cap-place').value='';
+  document.getElementById('cap-city').value='';
   document.getElementById('cap-country').value='';
   document.getElementById('cap-url').value='';
   document.getElementById('cap-country-suggestions').innerHTML='';
   document.getElementById('cap-country-status').textContent='';
+  document.getElementById('cap-place-drop').classList.remove('open');
+  setCaptureMode('place');
   capMsg('');
   openOverlay('ov-capture');
 }
