@@ -38,7 +38,7 @@
   .au-btns{display:flex;gap:10px;margin-top:16px}
   #au-msg{color:var(--ink-soft);font-size:13px;margin-top:14px;min-height:18px}
 
-  header.top{display:flex;align-items:center;justify-content:space-between;padding:34px 0 10px;gap:16px;flex-wrap:wrap}
+  header.top{display:flex;align-items:center;justify-content:space-between;padding:14px 0 6px;gap:16px}
   #logout-btn{margin-left:auto;width:34px;height:34px;border-radius:50%;padding:0;
     display:flex;align-items:center;justify-content:center;flex-shrink:0}
   .brand{display:flex;align-items:baseline;gap:12px}
@@ -73,8 +73,8 @@
   button.btn.small{padding:7px 12px;font-size:13px}
 
   #map{height:300px;border-radius:var(--radius);border:1px solid var(--line);margin-bottom:22px;box-shadow:var(--shadow)}
-  .grid{display:grid;gap:16px}
-  .grid.countries{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+  .grid{display:grid;gap:10px}
+  .grid.countries{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
   .grid.flights{grid-template-columns:1fr}
   .card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);
     padding:18px 20px;position:relative;cursor:pointer;transition:transform .15s}
@@ -82,10 +82,11 @@
   .card .del{position:absolute;top:12px;right:12px;border:none;background:none;color:var(--ink-soft);
     cursor:pointer;font-size:18px;opacity:.4}
   .card .del:hover{opacity:1;color:#b4544a}
-  .country-flag{font-size:38px}
-  .country-card h3{font-family:'Fraunces',serif;font-size:20px;font-weight:600;margin:6px 0 2px}
-  .country-card .when{color:var(--gold);font-size:14px;font-family:'Fraunces',serif}
-  .country-card .notes{color:var(--ink-soft);font-size:14px;margin-top:4px}
+  .country-card{display:flex;align-items:center;gap:11px;padding:11px 14px}
+  .country-flag{font-size:26px;flex-shrink:0;line-height:1}
+  .country-card h3{font-family:'Fraunces',serif;font-size:16px;font-weight:600;margin:0 0 1px}
+  .country-card .when{color:var(--gold);font-size:12px;font-family:'Fraunces',serif}
+  .country-card .notes{color:var(--ink-soft);font-size:13px;margin-top:2px}
   .flight-route{display:flex;align-items:center;gap:14px;font-family:'Fraunces',serif;font-size:22px;font-weight:600}
   .flight-route .arrow{flex:1;height:1px;background:repeating-linear-gradient(90deg,var(--line) 0 6px,transparent 6px 12px)}
   .flight-meta{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:12px;color:var(--ink-soft);font-size:15px}
