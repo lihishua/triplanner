@@ -2050,7 +2050,11 @@ function renderTodos() {
   const items = todos.filter(t => (t.category || 'todos') === activePrepTab)
     .sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1));
   if (!items.length) {
-    el.innerHTML = '<div class="empty">No tasks yet. Add things you need to do before the trip, or ask AI to suggest some.</div>';
+    const isPrivateTab = prepTabs.find(t => t.id === activePrepTab)?.private;
+    const emptyMsg = isPrivateTab
+      ? 'Add items visible just for you — like a present you want to buy them, or things to sort out before you go.'
+      : 'No tasks yet. Add things you need to do before the trip, or ask AI to suggest some.';
+    el.innerHTML = `<div class="empty">${emptyMsg}</div>`;
     return;
   }
   const today = new Date().toISOString().slice(0, 10);
@@ -2081,7 +2085,8 @@ function openAddTodo() {
   document.getElementById('todo-deadline-row').style.display = isNoDate ? 'none' : '';
   document.getElementById('todo-title').value = '';
   document.getElementById('todo-deadline').value = '';
-  document.getElementById('todo-private-row').style.display = GUEST_MODE ? 'none' : '';
+  const isPrivateTab = prepTabs.find(t => t.id === activePrepTab)?.private;
+  document.getElementById('todo-private-row').style.display = (GUEST_MODE || isPrivateTab) ? 'none' : '';
   document.getElementById('todo-private').checked = false;
   document.getElementById('todo-save-btn').textContent = 'Add';
   openOverlay('ov-todo');
@@ -2112,7 +2117,8 @@ async function saveTodo() {
     if (GUEST_MODE) { lsUpdate('todos', _editingTodoId, { title, deadline }); }
     else { await sb.from('trip_todos').update({ title, deadline }).eq('id', _editingTodoId); }
   } else {
-    const isPrivate = !GUEST_MODE && document.getElementById('todo-private').checked;
+    const isPrivateTab = prepTabs.find(t => t.id === activePrepTab)?.private;
+    const isPrivate = !GUEST_MODE && (isPrivateTab || document.getElementById('todo-private').checked);
     const row = { trip_id: TRIP_ID, title, deadline, done: false, category: activePrepTab,
       private: isPrivate, created_by: GUEST_MODE ? null : _myUserId };
     let newId = null;
