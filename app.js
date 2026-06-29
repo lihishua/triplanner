@@ -6,6 +6,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let TRIP_ID = null;
 let GUEST_MODE = false;
 let _myUserId = null;
+let _appReady = false;
 let myTrips = [];
 let countries = [];
 let places = [];
@@ -48,16 +49,19 @@ async function init() {
     enterAsGuest(false);
     return;
   }
+  // Register listener BEFORE getSession so token refreshes are never missed
+  sb.auth.onAuthStateChange((e, s) => {
+    if (e === 'PASSWORD_RECOVERY') { _passwordRecoveryPending = true; showAuth(); openOverlay('ov-reset-pass'); return; }
+    if (_passwordRecoveryPending) return;
+    if (s) onLoggedIn(); else showAuth();
+  });
   try {
+    // getSession triggers a token refresh if the access token is expired;
+    // onAuthStateChange will fire once the refresh completes
     const { data: { session } } = await sb.auth.getSession();
     if (_passwordRecoveryPending) { showAuth(); openOverlay('ov-reset-pass'); }
-    else if (session) onLoggedIn();
-    else showAuth();
-    sb.auth.onAuthStateChange((e, s) => {
-      if (e === 'PASSWORD_RECOVERY') { _passwordRecoveryPending = true; showAuth(); openOverlay('ov-reset-pass'); return; }
-      if (_passwordRecoveryPending) return;
-      if (s) onLoggedIn(); else showAuth();
-    });
+    else if (!session) showAuth(); // no session at all — show login
+    // if session exists, onAuthStateChange already called onLoggedIn()
   } catch (e) {
     showAuth();
   }
@@ -134,6 +138,7 @@ async function doLogout() {
     return;
   }
   if (!confirm('Sign out?')) return;
+  _appReady = false;
   await sb.auth.signOut();
 }
 function authMsg(m){ document.getElementById('au-msg').textContent = m; }
@@ -147,6 +152,8 @@ function togglePw(inputId, btn) {
 }
 
 async function onLoggedIn() {
+  if (_appReady) return;
+  _appReady = true;
   GUEST_MODE = false;
   document.getElementById('auth').style.display = 'none';
   const { data: { user: _u } } = await sb.auth.getUser();
