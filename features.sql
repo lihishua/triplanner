@@ -79,6 +79,12 @@ alter table prep_tabs enable row level security;
 create policy prep_tabs_all on prep_tabs for all
   using (is_trip_member(trip_id)) with check (is_trip_member(trip_id));
 
+-- Feature 9: Private prep items and tabs (visible only to creator)
+alter table trip_todos add column if not exists private boolean default false;
+alter table trip_todos add column if not exists created_by uuid references auth.users(id) default null;
+alter table prep_tabs  add column if not exists private boolean default false;
+alter table prep_tabs  add column if not exists created_by uuid references auth.users(id) default null;
+
 -- Feature 8: Leave / remove a trip from your account
 create or replace function leave_trip(p_trip_id uuid)
 returns void language plpgsql security definer as $$

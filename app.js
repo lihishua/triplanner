@@ -5,6 +5,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let TRIP_ID = null;
 let GUEST_MODE = false;
+let _myUserId = null;
 let myTrips = [];
 let countries = [];
 let places = [];
@@ -148,6 +149,8 @@ function togglePw(inputId, btn) {
 async function onLoggedIn() {
   GUEST_MODE = false;
   document.getElementById('auth').style.display = 'none';
+  const { data: { user: _u } } = await sb.auth.getUser();
+  _myUserId = _u?.id || null;
 
   if (_pendingInviteToken) {
     const token = _pendingInviteToken;
@@ -1961,19 +1964,20 @@ async function refreshTodos() {
     sb.from('trip_todos').select('*').eq('trip_id', TRIP_ID).order('deadline').order('created_at'),
     sb.from('prep_tabs').select('*').eq('trip_id', TRIP_ID).order('created_at'),
   ]);
-  todos = t.data || [];
-  prepTabs = pt.data || [];
+  todos = (t.data || []).filter(x => !x.private || x.created_by === _myUserId);
+  prepTabs = (pt.data || []).filter(x => !x.private || x.created_by === _myUserId);
   renderPrepTabs(); renderTodos();
 }
 
 function renderPrepTabs() {
   const el = document.getElementById('prepTabBar');
   if (!el) return;
-  const allTabs = [...PREP_BUILTIN_TABS, ...prepTabs.map(t => ({ id: t.id, name: t.name }))];
+  const allTabs = [...PREP_BUILTIN_TABS, ...prepTabs.map(t => ({ id: t.id, name: t.name, private: t.private }))];
   if (!allTabs.find(t => t.id === activePrepTab)) activePrepTab = 'todos';
+  const lockSvg = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.5;margin-left:3px;vertical-align:middle"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
   el.innerHTML = allTabs.map(t =>
     `<button class="prep-tab${t.id === activePrepTab ? ' active' : ''}" onclick="switchPrepTab('${t.id}')">
-      ${esc(t.name)}<span class="prep-tab-x" onclick="event.stopPropagation();deletePrepTab('${t.id}')">×</span>
+      ${esc(t.name)}${t.private ? lockSvg : ''}<span class="prep-tab-x" onclick="event.stopPropagation();deletePrepTab('${t.id}')">×</span>
     </button>`
   ).join('') + `<button class="prep-tab add" onclick="openAddPrepTab()">＋</button>`;
 }
@@ -2013,13 +2017,16 @@ function switchPrepTab(id) {
 
 function openAddPrepTab() {
   document.getElementById('prep-tab-name').value = '';
+  document.getElementById('prep-tab-private').checked = false;
+  document.getElementById('prep-tab-private-row').style.display = GUEST_MODE ? 'none' : '';
   openOverlay('ov-prep-tab');
 }
 
 async function savePrepTab() {
   const name = document.getElementById('prep-tab-name').value.trim();
   if (!name) return;
-  const row = { trip_id: TRIP_ID, name };
+  const isPrivate = !GUEST_MODE && document.getElementById('prep-tab-private').checked;
+  const row = { trip_id: TRIP_ID, name, private: isPrivate, created_by: GUEST_MODE ? null : _myUserId };
   let newTab;
   if (GUEST_MODE) {
     newTab = lsInsert('prep_tabs', row);
@@ -2054,7 +2061,7 @@ function renderTodos() {
       <div class="todo-check${t.done ? ' done' : ''}" onclick="toggleTodo('${t.id}')">
         ${t.done ? '✓' : ''}
       </div>
-      <span class="todo-title${t.done ? ' done' : ''}" onclick="openEditTodo('${t.id}')">${esc(t.title)}</span>
+      <span class="todo-title${t.done ? ' done' : ''}" onclick="openEditTodo('${t.id}')">${esc(t.title)}${t.private ? ' <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.45;vertical-align:middle"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>' : ''}</span>
       ${deadlineLabel ? `<span class="todo-deadline${overdue ? ' overdue' : ''}" onclick="openEditTodo('${t.id}')">${overdue ? '⚠ ' : ''}${deadlineLabel}</span>` : ''}
       <button class="del" style="position:static;opacity:.3;font-size:16px" onclick="deleteTodo('${t.id}')">×</button>
     </div>`;
@@ -2065,7 +2072,6 @@ let _editingTodoId = null;
 
 function openAddTodo() {
   _editingTodoId = null;
-  const isBuiltin = PREP_BUILTIN_TABS.some(t => t.id === activePrepTab);
   const isNoDate = activePrepTab === 'first_aid' || activePrepTab === 'shopping';
   const title = activePrepTab === 'todos' ? 'Add todo' : 'Add item';
   document.getElementById('todo-modal-title').textContent = title;
@@ -2073,6 +2079,9 @@ function openAddTodo() {
   document.getElementById('todo-deadline-row').style.display = isNoDate ? 'none' : '';
   document.getElementById('todo-title').value = '';
   document.getElementById('todo-deadline').value = '';
+  document.getElementById('todo-private-row').style.display = GUEST_MODE ? 'none' : '';
+  document.getElementById('todo-private').checked = false;
+  document.getElementById('todo-save-btn').textContent = 'Add';
   openOverlay('ov-todo');
 }
 
@@ -2085,6 +2094,8 @@ function openEditTodo(id) {
   document.getElementById('todo-deadline-row').style.display = isNoDate ? 'none' : '';
   document.getElementById('todo-title').value = t.title;
   document.getElementById('todo-deadline').value = t.deadline || '';
+  document.getElementById('todo-private-row').style.display = 'none';
+  document.getElementById('todo-save-btn').textContent = 'Save';
   openOverlay('ov-todo');
 }
 
@@ -2099,7 +2110,9 @@ async function saveTodo() {
     if (GUEST_MODE) { lsUpdate('todos', _editingTodoId, { title, deadline }); }
     else { await sb.from('trip_todos').update({ title, deadline }).eq('id', _editingTodoId); }
   } else {
-    const row = { trip_id: TRIP_ID, title, deadline, done: false, category: activePrepTab };
+    const isPrivate = !GUEST_MODE && document.getElementById('todo-private').checked;
+    const row = { trip_id: TRIP_ID, title, deadline, done: false, category: activePrepTab,
+      private: isPrivate, created_by: GUEST_MODE ? null : _myUserId };
     let newId = null;
     if (GUEST_MODE) { newId = lsInsert('todos', row).id; }
     else {

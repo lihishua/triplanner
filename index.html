@@ -460,9 +460,15 @@
     <label>Deadline (optional)</label>
     <input id="todo-deadline" type="date">
   </div>
+  <div id="todo-private-row" style="display:none;margin-top:10px">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px">
+      <input id="todo-private" type="checkbox" style="width:auto;margin:0">
+      Visible just for me
+    </label>
+  </div>
   <div class="modal-actions">
     <button class="btn ghost" onclick="closeAll()">Cancel</button>
-    <button class="btn" onclick="saveTodo()">Add</button>
+    <button id="todo-save-btn" class="btn" onclick="saveTodo()">Add</button>
   </div>
 </div></div>
 
@@ -471,6 +477,12 @@
   <h3>New tab</h3>
   <label>Tab name</label>
   <input id="prep-tab-name" placeholder="e.g. Kids' stuff">
+  <div id="prep-tab-private-row" style="margin-top:10px">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px">
+      <input id="prep-tab-private" type="checkbox" style="width:auto;margin:0">
+      Visible just for me
+    </label>
+  </div>
   <div class="modal-actions">
     <button class="btn ghost" onclick="closeAll()">Cancel</button>
     <button class="btn" onclick="savePrepTab()">Add</button>
