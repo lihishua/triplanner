@@ -38,13 +38,14 @@
   .au-btns{display:flex;gap:10px;margin-top:16px}
   #au-msg{color:var(--ink-soft);font-size:13px;margin-top:14px;min-height:18px}
 
-  header.top{display:flex;align-items:center;justify-content:space-between;padding:14px 0 6px;gap:16px}
-  #logout-btn{margin-left:auto;width:34px;height:34px;border-radius:50%;padding:0;
+  header.top{padding:14px 0 4px}
+  .brand-row{display:flex;align-items:center;justify-content:space-between}
+  .brand-title{display:flex;align-items:center;gap:10px}
+  .brand-title h1{font-family:'Fraunces',serif;font-weight:600;font-size:28px;letter-spacing:.5px;line-height:1;text-transform:uppercase;margin:0}
+  .brand-title .dot{width:9px;height:9px;border-radius:50%;background:var(--gold);display:inline-block;flex-shrink:0}
+  .brand-sub{color:var(--ink-soft);font-style:italic;font-size:14px;margin-top:2px}
+  #logout-btn{width:34px;height:34px;border-radius:50%;padding:0;
     display:flex;align-items:center;justify-content:center;flex-shrink:0}
-  .brand{display:flex;align-items:baseline;gap:12px}
-  .brand h1{font-family:'Fraunces',serif;font-weight:600;font-size:30px;letter-spacing:.5px;line-height:1;text-transform:uppercase}
-  .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--gold);display:inline-block;transform:translateY(-2px)}
-  .brand small{color:var(--ink-soft);font-style:italic;font-size:15px}
   .top-actions{display:flex;align-items:center;margin-top:12px;margin-bottom:2px;gap:0}
   .top-actions button{font-family:'Fraunces',serif;font-size:13px;color:var(--ink-soft);background:none;
     border:none;padding:5px 16px;cursor:pointer;white-space:nowrap;position:relative;letter-spacing:.01em}
@@ -82,9 +83,10 @@
   .card .del{position:absolute;top:12px;right:12px;border:none;background:none;color:var(--ink-soft);
     cursor:pointer;font-size:18px;opacity:.4}
   .card .del:hover{opacity:1;color:#b4544a}
-  .country-card{display:flex;align-items:center;gap:11px;padding:11px 14px}
-  .country-flag{font-size:26px;flex-shrink:0;line-height:1}
-  .country-card h3{font-family:'Fraunces',serif;font-size:16px;font-weight:600;margin:0 0 1px}
+  .country-card{padding:12px 14px}
+  .country-card-top{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+  .country-flag{font-size:24px;line-height:1;flex-shrink:0}
+  .country-card h3{font-family:'Fraunces',serif;font-size:16px;font-weight:600;margin:0;line-height:1.2}
   .country-card .when{color:var(--gold);font-size:12px;font-family:'Fraunces',serif}
   .country-card .notes{color:var(--ink-soft);font-size:13px;margin-top:2px}
   .flight-route{display:flex;align-items:center;gap:14px;font-family:'Fraunces',serif;font-size:22px;font-weight:600}
@@ -373,10 +375,13 @@
 <div id="app" style="display:none">
   <div class="wrap">
     <header class="top">
-      <div class="brand"><span class="dot"></span><h1>TriPlan</h1><small>plan your trip. together.</small></div>
-      <button id="logout-btn" class="btn ghost small" onclick="doLogout()" title="Sign out" aria-label="Sign out">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-      </button>
+      <div class="brand-row">
+        <div class="brand-title"><span class="dot"></span><h1>TriPlan</h1></div>
+        <button id="logout-btn" class="btn ghost small" onclick="doLogout()" title="Sign out" aria-label="Sign out">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+      <div class="brand-sub">plan your trip. together.</div>
     </header>
     <div id="trip-carousel" class="trip-carousel" style="display:none"></div>
     <div style="margin:6px 0 2px">

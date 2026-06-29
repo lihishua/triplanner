@@ -644,8 +644,10 @@ function renderCountries() {
       const n = places.filter(ci => ci.country_id === c.id).length;
       const daysLabel = c.planned_days ? ` · ${c.planned_days} days` : '';
       return `<div class="card country-card" onclick="openCountry('${c.id}')">
-        <div class="country-flag">${esc(c.flag) || '🌍'}</div>
-        <h3>${esc(c.name)}</h3>
+        <div class="country-card-top">
+          <span class="country-flag">${esc(c.flag) || '🌍'}</span>
+          <h3>${esc(c.name)}</h3>
+        </div>
         <div class="when">${n} ${n === 1 ? 'place' : 'places'}${daysLabel}</div>
       </div>`;
     }).join('');
