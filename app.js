@@ -2352,6 +2352,7 @@ function showTab(t) {
   document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + t));
   if (t === 'prep') refreshTodos();
+  document.querySelector('.fab').style.display = t === 'countries' ? '' : 'none';
 }
 
 init();
