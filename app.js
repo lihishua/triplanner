@@ -418,6 +418,7 @@ let _urlDebounce   = null;
 let _capType       = 'place'; // 'place' | 'hotel' | 'flight'
 let _smartImageFile = null;
 let _smartImageB64  = null;
+let _smartImageType = null;
 let _smartParseResult = null;
 let _smartDestination = null;
 
@@ -1521,6 +1522,7 @@ function handleSmartImageFile(file) {
   const reader = new FileReader();
   reader.onload = e => {
     _smartImageB64 = e.target.result.split(',')[1];
+    _smartImageType = file.type || 'image/jpeg';
     document.getElementById('si-image-thumb').src = e.target.result;
     document.getElementById('si-image-preview').style.display = '';
     document.getElementById('si-msg').textContent = '';
@@ -1531,6 +1533,7 @@ function handleSmartImageFile(file) {
 function clearSmartImage() {
   _smartImageFile = null;
   _smartImageB64  = null;
+  _smartImageType = null;
   document.getElementById('si-image-preview').style.display = 'none';
   document.getElementById('si-image-thumb').src = '';
   document.getElementById('si-file').value = '';
@@ -1557,6 +1560,7 @@ async function submitSmartInput() {
   const body = { tripContext };
   if (text)         body.text        = text;
   if (_smartImageB64) body.imageBase64 = _smartImageB64;
+  if (_smartImageB64) body.imageMediaType = _smartImageType || 'image/jpeg';
 
   try {
     const { data, error } = await sb.functions.invoke('smart-parse', { body });
@@ -1658,7 +1662,7 @@ async function confirmSmartInput() {
   }
 
   // todo / unknown — save to selected prep tab
-  const text = result.extractedData?.text || rawText;
+  const text = result.extractedData?.text || rawText || result.summary || '';
   await saveSmartTodo(text, dest);
 }
 
@@ -1713,7 +1717,7 @@ async function saveSmartHotel({ name, city, country, link }, fallbackText) {
 async function saveSmartTodo(text, category) {
   if (!text) return;
   const row = {
-    trip_id: TRIP_ID, text, done: false,
+    trip_id: TRIP_ID, title: text, done: false,
     category: category || 'todos',
     created_at: new Date().toISOString(),
   };

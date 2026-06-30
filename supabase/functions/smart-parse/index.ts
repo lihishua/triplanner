@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
   try {
-    const { text, imageBase64, tripContext } = await req.json();
+    const { text, imageBase64, imageMediaType, tripContext } = await req.json();
     if (!text && !imageBase64) return json({ error: "Provide text or image" }, 400);
 
     const key = Deno.env.get("ANTHROPIC_API_KEY");
@@ -51,7 +51,7 @@ For unknown content, still make a best guess at type and destination.`;
     if (imageBase64) {
       contentBlocks.push({
         type: "image",
-        source: { type: "base64", media_type: "image/jpeg", data: imageBase64 },
+        source: { type: "base64", media_type: (imageMediaType || "image/jpeg") as "image/jpeg" | "image/png" | "image/gif" | "image/webp", data: imageBase64 },
       });
     }
     contentBlocks.push({
@@ -95,6 +95,10 @@ For unknown content, still make a best guess at type and destination.`;
 
     const VALID_TYPES = ['flight', 'hotel', 'place', 'todo', 'unknown'];
     if (!VALID_TYPES.includes(type)) type = 'unknown';
+
+    const validPrepIds = (tripContext?.prepTabs || []).map((t: { id: string }) => t.id);
+    const knownDests = ['flight_research', 'hotels', 'countries', ...validPrepIds];
+    if (!knownDests.includes(destination)) destination = 'todos';
 
     return json({ type, summary, destination, extractedData });
   } catch (e) {
