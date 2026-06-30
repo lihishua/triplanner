@@ -1607,6 +1607,125 @@ function selectSmartDest(id, btn) {
     .forEach(b => b.classList.toggle('active', b === btn));
 }
 
+async function confirmSmartInput() {
+  const result = _smartParseResult;
+  if (!result) return;
+  const dest    = _smartDestination;
+  const booked  = document.getElementById('si-booked')?.checked;
+  const rawText = document.getElementById('si-text').value.trim();
+
+  closeAll();
+
+  if (result.type === 'flight' && booked) {
+    openFlight();
+    const d = result.extractedData || {};
+    if (d.origin)      document.getElementById('f-origin').value      = d.origin;
+    if (d.destination) document.getElementById('f-destination').value  = d.destination;
+    if (d.depart_date) document.getElementById('f-depart_date').value  = d.depart_date;
+    if (d.depart_time) document.getElementById('f-depart_time').value  = d.depart_time;
+    if (d.airline)     document.getElementById('f-airline').value      = d.airline;
+    if (d.flight_no)   document.getElementById('f-flight_no').value    = d.flight_no;
+    if (d.price)       document.getElementById('f-price').value        = d.price;
+    if (d.notes)       document.getElementById('f-notes').value        = d.notes;
+    return;
+  }
+
+  if (result.type === 'flight') {
+    const d = result.extractedData || {};
+    const content = [d.origin, d.destination, d.depart_date, d.airline, d.flight_no, d.price]
+      .filter(Boolean).join(' · ') || rawText;
+    await saveSmartResearch(content, _smartImageFile);
+    showTab('flights');
+    return;
+  }
+
+  if (result.type === 'hotel') {
+    await saveSmartHotel(result.extractedData || {}, rawText);
+    return;
+  }
+
+  if (result.type === 'place') {
+    const d = result.extractedData || {};
+    const countryName = d.country || d.name;
+    if (countryName) {
+      const c = await ensureCountry(cap(countryName), FLAGS[countryName.toLowerCase()] || '🌍');
+      if (c && d.name && d.name.toLowerCase() !== countryName.toLowerCase()) {
+        await ensurePlace(cap(d.name), c.id);
+      }
+    }
+    await refreshAll();
+    return;
+  }
+
+  // todo / unknown — save to selected prep tab
+  const text = result.extractedData?.text || rawText;
+  await saveSmartTodo(text, dest);
+}
+
+async function saveSmartResearch(content, imageFile) {
+  if (GUEST_MODE) {
+    lsInsert('flight_research', {
+      trip_id: TRIP_ID, content: content || null,
+      image_url: _smartImageB64 || null,
+      created_at: new Date().toISOString(),
+    });
+    research = lsGet('flight_research').filter(r => r.trip_id === TRIP_ID)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+    renderResearch();
+    return;
+  }
+
+  let imageUrl = null;
+  if (imageFile) {
+    const path = `${TRIP_ID}/${Date.now()}-${imageFile.name}`;
+    const { error: upErr } = await sb.storage.from('research').upload(path, imageFile);
+    if (!upErr) {
+      imageUrl = sb.storage.from('research').getPublicUrl(path).data.publicUrl;
+    }
+  }
+
+  await sb.from('flight_research').insert({
+    trip_id: TRIP_ID,
+    content: content || null,
+    image_url: imageUrl,
+  });
+  await refreshAll();
+}
+
+async function saveSmartHotel({ name, city, country, link }, fallbackText) {
+  const effectiveCountry = country || city || fallbackText;
+  if (!effectiveCountry) return;
+  const c = await ensureCountry(cap(effectiveCountry), FLAGS[effectiveCountry.toLowerCase()] || '🌍');
+  if (!c) return;
+  let place = null;
+  if (city && city.toLowerCase() !== effectiveCountry.toLowerCase()) {
+    place = await ensurePlace(cap(city), c.id);
+  }
+  const row = {
+    trip_id: TRIP_ID, country_id: c.id, place_id: place?.id || null,
+    name: cap(name) || 'Untitled hotel', link: link || null, booked: false,
+  };
+  if (GUEST_MODE) lsInsert('hotels', row);
+  else await sb.from('hotels').insert(row);
+  await refreshAll();
+}
+
+async function saveSmartTodo(text, category) {
+  if (!text) return;
+  const row = {
+    trip_id: TRIP_ID, text, done: false,
+    category: category || 'todos',
+    created_at: new Date().toISOString(),
+  };
+  if (GUEST_MODE) lsInsert('todos', row);
+  else await sb.from('trip_todos').insert(row);
+  await refreshTodos();
+  showTab('prep');
+  activePrepTab = category || 'todos';
+  renderPrepTabs();
+  renderTodos();
+}
+
 /* ---------------- FLIGHT RESEARCH ---------------- */
 function renderResearch() {
   const el = document.getElementById('researchList');
