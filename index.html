@@ -312,6 +312,19 @@
   .trip-chip:hover{border-color:var(--accent);color:var(--accent)}
   .trip-chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
   .trip-chip.add{border-style:dashed}
+
+  /* Smart input modal */
+  #si-image-preview{display:flex;align-items:center;gap:8px;margin-top:8px}
+  #si-image-thumb{width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--border)}
+  #si-clear-img{background:none;border:none;font-size:18px;cursor:pointer;color:var(--ink-soft);padding:0;line-height:1}
+  #si-msg{color:var(--accent);font-size:14px;min-height:18px;margin-top:8px}
+  #si-thinking{text-align:center;padding:24px 0;color:var(--ink-soft);font-style:italic}
+  #si-summary{font-size:15px;line-height:1.5;margin-bottom:12px;color:var(--ink)}
+  .si-tab-pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+  .si-tab-pill{padding:4px 12px;border-radius:20px;border:1.5px solid var(--border);background:none;cursor:pointer;font-size:13px;color:var(--ink-soft)}
+  .si-tab-pill.active{border-color:var(--accent);color:var(--accent);font-weight:600}
+  #si-file-label{padding:8px 12px;font-size:20px;cursor:pointer;border:1.5px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;background:none;color:var(--ink-soft)}
+  #si-file-label:hover{border-color:var(--accent);color:var(--accent)}
 </style>
 </head>
 <body>
@@ -454,7 +467,7 @@
 
     <footer>Shared between both of you · saved to your Supabase project.</footer>
   </div>
-  <button class="fab" onclick="openCapture()">＋</button>
+  <button class="fab" onclick="openSmartInput()">＋</button>
 </div>
 
 <!-- Add Todo modal -->
@@ -734,6 +747,56 @@
     <div id="preview-card"></div>
   </div>
 </div>
+
+<!-- Smart universal input -->
+<div class="overlay" id="ov-smart-input"><div class="modal">
+
+  <!-- State: input -->
+  <div id="si-input-state">
+    <h3>Add anything</h3>
+    <textarea id="si-text" rows="4" placeholder="Paste a link, type a note, describe a flight… anything" style="width:100%;box-sizing:border-box;resize:vertical"></textarea>
+    <div id="si-image-preview" style="display:none">
+      <img id="si-image-thumb" src="" alt="preview">
+      <button id="si-clear-img" onclick="clearSmartImage()" title="Remove image">×</button>
+    </div>
+    <div id="si-msg"></div>
+    <div class="modal-actions" style="gap:8px">
+      <button class="btn ghost" onclick="closeAll()">Cancel</button>
+      <label id="si-file-label" title="Attach image">
+        📎
+        <input type="file" id="si-file" accept="image/*" style="display:none" onchange="onSmartImagePick(this)">
+      </label>
+      <button class="btn" onclick="submitSmartInput()">✓</button>
+    </div>
+  </div>
+
+  <!-- State: thinking -->
+  <div id="si-thinking-state" style="display:none">
+    <div id="si-thinking">thinking…</div>
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="closeAll()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- State: confirmation -->
+  <div id="si-confirm-state" style="display:none">
+    <div id="si-summary"></div>
+    <div id="si-flight-controls" style="display:none;margin-bottom:12px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="si-booked"> Already booked
+      </label>
+    </div>
+    <div id="si-tab-controls" style="display:none;margin-bottom:12px">
+      <div style="font-size:13px;color:var(--ink-soft);margin-bottom:6px">Save to tab:</div>
+      <div id="si-tab-pills" class="si-tab-pills"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="closeAll()">Cancel</button>
+      <button class="btn" onclick="confirmSmartInput()">OK</button>
+    </div>
+  </div>
+
+</div></div>
 
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
