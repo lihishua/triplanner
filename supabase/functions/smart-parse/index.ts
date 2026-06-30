@@ -23,6 +23,7 @@ Deno.serve(async (req) => {
     ];
 
     const systemPrompt = `You are a travel app assistant. Parse the user's input and classify it.
+Today's date is ${new Date().toISOString().slice(0, 10)}.
 
 Existing countries in this trip: ${countries.length ? countries.join(", ") : "none yet"}
 Available prep tabs: ${prepTabs.map((t) => `${t.id} ("${t.name}")`).join(", ")}
@@ -76,6 +77,7 @@ For unknown content, still make a best guess at type and destination.`;
     });
 
     const data = await r.json();
+    if (!r.ok) return json({ error: `Anthropic API error: ${JSON.stringify(data)}` }, 502);
     const raw = (data.content || []).map((b: { text: string }) => b.text).join("").trim();
 
     let type = "unknown", summary = "Could not parse", destination = "todos";
@@ -90,6 +92,9 @@ For unknown content, still make a best guess at type and destination.`;
         extractedData = parsed.extractedData || {};
       }
     } catch (_) {}
+
+    const VALID_TYPES = ['flight', 'hotel', 'place', 'todo', 'unknown'];
+    if (!VALID_TYPES.includes(type)) type = 'unknown';
 
     return json({ type, summary, destination, extractedData });
   } catch (e) {
