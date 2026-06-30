@@ -416,6 +416,10 @@ async function geocode(q) {
 let _placeDebounce = null;
 let _urlDebounce   = null;
 let _capType       = 'place'; // 'place' | 'hotel' | 'flight'
+let _smartImageFile = null;
+let _smartImageB64  = null;
+let _smartParseResult = null;
+let _smartDestination = null;
 
 const HOTEL_URL_PATTERNS  = ['booking.com/hotel','airbnb.com/room','airbnb.com/h/','hotels.com','hostelworld.com','agoda.com/','trivago.com','marriott.com','hilton.com','hyatt.com','ihg.com','radisson.com','accorhotels.com'];
 const FLIGHT_URL_PATTERNS = ['skyscanner.','kayak.com/flight','google.com/travel/flights','expedia.com/flight','momondo.','kiwi.com','flightaware.','ryanair.com','easyjet.com','wizzair.','airasia.com/flight'];
@@ -1468,6 +1472,140 @@ function openCapture(){
 function capMsg(m){ document.getElementById('cap-msg').textContent=m; }
 function closeAll(){ document.querySelectorAll('.overlay').forEach(o=>o.classList.remove('show')); }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeAll(); closePreview(); } });
+document.addEventListener('paste', e => {
+  if (!document.getElementById('ov-smart-input').classList.contains('show')) return;
+  const items = e.clipboardData?.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      e.preventDefault();
+      handleSmartImageFile(item.getAsFile());
+      return;
+    }
+  }
+});
+
+/* ---------------- SMART UNIVERSAL INPUT ---------------- */
+
+function openSmartInput() {
+  document.getElementById('si-text').value = '';
+  document.getElementById('si-msg').textContent = '';
+  document.getElementById('si-image-preview').style.display = 'none';
+  document.getElementById('si-image-thumb').src = '';
+  document.getElementById('si-file').value = '';
+  _smartImageFile = null;
+  _smartImageB64  = null;
+  _smartParseResult = null;
+  _smartDestination = null;
+  setSmartState('input');
+  openOverlay('ov-smart-input');
+}
+
+function setSmartState(state) {
+  document.getElementById('si-input-state').style.display    = state === 'input'   ? '' : 'none';
+  document.getElementById('si-thinking-state').style.display = state === 'thinking' ? '' : 'none';
+  document.getElementById('si-confirm-state').style.display  = state === 'confirm'  ? '' : 'none';
+}
+
+function onSmartImagePick(input) {
+  const file = input.files[0];
+  if (file) handleSmartImageFile(file);
+}
+
+function handleSmartImageFile(file) {
+  if (file.size > 5 * 1024 * 1024) {
+    document.getElementById('si-msg').textContent = 'Image too large (max 5 MB).';
+    return;
+  }
+  _smartImageFile = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    _smartImageB64 = e.target.result.split(',')[1];
+    document.getElementById('si-image-thumb').src = e.target.result;
+    document.getElementById('si-image-preview').style.display = '';
+    document.getElementById('si-msg').textContent = '';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearSmartImage() {
+  _smartImageFile = null;
+  _smartImageB64  = null;
+  document.getElementById('si-image-preview').style.display = 'none';
+  document.getElementById('si-image-thumb').src = '';
+  document.getElementById('si-file').value = '';
+}
+
+async function submitSmartInput() {
+  const text = document.getElementById('si-text').value.trim();
+  if (!text && !_smartImageB64) {
+    document.getElementById('si-msg').textContent = 'Type something or attach an image.';
+    return;
+  }
+
+  setSmartState('thinking');
+
+  const allPrepTabs = [
+    ...PREP_BUILTIN_TABS,
+    ...prepTabs.map(t => ({ id: t.id, name: t.name })),
+  ];
+  const tripContext = {
+    countries: countries.map(c => c.name),
+    prepTabs: allPrepTabs,
+  };
+
+  const body = { tripContext };
+  if (text)         body.text        = text;
+  if (_smartImageB64) body.imageBase64 = _smartImageB64;
+
+  try {
+    const { data, error } = await sb.functions.invoke('smart-parse', { body });
+    if (error) throw error;
+    _smartParseResult = data;
+    _smartDestination = data.destination;
+    showSmartConfirmation(data);
+  } catch (_) {
+    setSmartState('input');
+    document.getElementById('si-msg').textContent = '⚠ Could not parse. Try rephrasing.';
+  }
+}
+
+function showSmartConfirmation(result) {
+  document.getElementById('si-summary').textContent = result.summary;
+
+  const flightCtrl = document.getElementById('si-flight-controls');
+  const tabCtrl    = document.getElementById('si-tab-controls');
+
+  if (result.type === 'flight') {
+    flightCtrl.style.display = '';
+    document.getElementById('si-booked').checked = false;
+    tabCtrl.style.display = 'none';
+  } else if (result.type === 'todo' || result.destination === 'todos' ||
+             ['todos','shopping','first_aid'].includes(result.destination) ||
+             prepTabs.find(t => t.id === result.destination)) {
+    flightCtrl.style.display = 'none';
+    const allPrepTabs = [
+      ...PREP_BUILTIN_TABS,
+      ...prepTabs.map(t => ({ id: t.id, name: t.name })),
+    ];
+    document.getElementById('si-tab-pills').innerHTML = allPrepTabs.map(t =>
+      `<button class="si-tab-pill${t.id === _smartDestination ? ' active' : ''}"
+        onclick="selectSmartDest('${t.id}',this)">${esc(t.name)}</button>`
+    ).join('');
+    tabCtrl.style.display = '';
+  } else {
+    flightCtrl.style.display = 'none';
+    tabCtrl.style.display = 'none';
+  }
+
+  setSmartState('confirm');
+}
+
+function selectSmartDest(id, btn) {
+  _smartDestination = id;
+  document.querySelectorAll('#si-tab-pills .si-tab-pill')
+    .forEach(b => b.classList.toggle('active', b === btn));
+}
 
 /* ---------------- FLIGHT RESEARCH ---------------- */
 function renderResearch() {
