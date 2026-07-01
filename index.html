@@ -808,6 +808,16 @@
 
 </div></div>
 
+<!-- Booking confirmation -->
+<div class="overlay" id="ov-book-confirm"><div class="modal">
+  <h3>Congrats! 🎉</h3>
+  <p id="book-confirm-msg" style="margin:8px 0 20px;color:var(--ink-soft);font-size:15px;line-height:1.5"></p>
+  <div class="modal-actions">
+    <button class="btn ghost" onclick="cancelBookFlight()">Cancel</button>
+    <button class="btn" onclick="confirmBookFlight()">OK</button>
+  </div>
+</div></div>
+
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>

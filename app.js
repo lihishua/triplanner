@@ -1268,6 +1268,74 @@ async function delFlight(id){
   await sb.from('flights').delete().eq('id', id); await refreshAll();
 }
 
+let _pendingBookId   = null;
+let _pendingBookChkb = null;
+
+async function toggleFlightBooked(id, checkbox) {
+  const f = flights.find(x => x.id === id);
+  if (!f) return;
+
+  if (!checkbox.checked) {
+    // Un-booking: just save, no confirmation
+    f.booked = false;
+    if (GUEST_MODE) lsUpdate('flights', id, { booked: false });
+    else await sb.from('flights').update({ booked: false }).eq('id', id);
+    renderFlights();
+    return;
+  }
+
+  // Booking: check for siblings
+  const key = legKey(f.origin, f.destination);
+  const siblings = flights.filter(x => x.id !== id && legKey(x.origin, x.destination) === key);
+
+  if (!siblings.length) {
+    // No siblings — save immediately
+    f.booked = true;
+    if (GUEST_MODE) lsUpdate('flights', id, { booked: true });
+    else await sb.from('flights').update({ booked: true }).eq('id', id);
+    renderFlights();
+    return;
+  }
+
+  // Show confirmation
+  _pendingBookId   = id;
+  _pendingBookChkb = checkbox;
+  const n = siblings.length;
+  document.getElementById('book-confirm-msg').textContent =
+    `I'll now delete the other ${n} option${n > 1 ? 's' : ''} for this leg. OK?`;
+  openOverlay('ov-book-confirm');
+}
+
+async function confirmBookFlight() {
+  closeAll();
+  const id = _pendingBookId;
+  _pendingBookId = _pendingBookChkb = null;
+  if (!id) return;
+
+  const f = flights.find(x => x.id === id);
+  if (!f) return;
+
+  const key = legKey(f.origin, f.destination);
+  const siblings = flights.filter(x => x.id !== id && legKey(x.origin, x.destination) === key);
+
+  for (const s of siblings) {
+    if (GUEST_MODE) lsDelete('flights', s.id);
+    else await sb.from('flights').delete().eq('id', s.id);
+  }
+
+  f.booked = true;
+  if (GUEST_MODE) lsUpdate('flights', id, { booked: true });
+  else await sb.from('flights').update({ booked: true }).eq('id', id);
+
+  await refreshAll();
+}
+
+function cancelBookFlight() {
+  closeAll();
+  if (_pendingBookChkb) _pendingBookChkb.checked = false;
+  _pendingBookId = _pendingBookChkb = null;
+}
+
 /* ---------------- BUDGET ---------------- */
 const CATEGORIES = ['Flights','Lodging','Food','Transport','Activities','Nanny','Other'];
 
