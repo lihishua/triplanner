@@ -1179,7 +1179,7 @@ function renderFlights() {
     <div class="leg-group" data-key="${esc(leg.key)}">
       <div class="leg-header">
         <span class="leg-label">${esc(leg.originLabel)} → ${esc(leg.destLabel)}</span>
-        <span class="drag-handle" data-key="${esc(leg.key)}" title="Drag to reorder">⠿</span>
+        <span class="drag-handle" draggable="true" data-key="${esc(leg.key)}" title="Drag to reorder">⠿</span>
       </div>
       <div class="leg-flights">
         ${leg.flights.map(f => renderFlightCard(f)).join('')}
@@ -1254,8 +1254,8 @@ function initLegDrag() {
     allKeys.splice(fromIdx, 1);
     allKeys.splice(toIdx, 0, _dragKey);
     cleanupLegDrag(el);
-    await saveLegOrder(allKeys);
     renderFlights();
+    saveLegOrder(allKeys);
   });
 
   el.addEventListener('dragend', () => cleanupLegDrag(el));
