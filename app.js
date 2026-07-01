@@ -1166,7 +1166,7 @@ function renderFlights() {
   const el = document.getElementById('flightList');
   const eligible = flights.filter(f => f.origin && f.destination);
   if (!eligible.length) {
-    el.innerHTML = '<div class="empty">No flights yet. Tap + to add your first leg.</div>';
+    el.innerHTML = '<div class="add-flight-card" onclick="openFlight()">＋</div>';
     return;
   }
   const legs = groupFlightsByLeg(eligible);
@@ -1186,7 +1186,7 @@ function renderFlights() {
         ${leg.flights.map(f => renderFlightCard(f)).join('')}
       </div>
     </div>
-  `).join('');
+  `).join('') + '<div class="add-flight-card" onclick="openFlight()">＋</div>';
   initLegDrag();
 }
 
