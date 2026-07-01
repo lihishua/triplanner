@@ -1198,7 +1198,18 @@ function renderFlightCard(f) {
       <button class="booked-btn${f.booked ? ' active' : ''}" data-booked="${f.booked ? 'true' : 'false'}"
         onclick="event.stopPropagation();toggleFlightBooked('${f.id}', this)"
         title="${f.booked ? 'Booked' : 'Mark as booked'}">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="${f.booked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+        ${f.booked ? `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="1" y="3" width="13" height="12" rx="2"/>
+          <line x1="4" y1="1" x2="4" y2="5"/><line x1="10" y1="1" x2="10" y2="5"/>
+          <line x1="1" y1="7" x2="14" y2="7"/>
+          <circle cx="15.5" cy="15.5" r="4.5" fill="currentColor" stroke="none"/>
+          <path d="M13.3 15.5l1.5 1.5 2.8-2.8" stroke="white" stroke-width="1.6" fill="none"/>
+        </svg>` : `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="1" y="3" width="13" height="12" rx="2"/>
+          <line x1="4" y1="1" x2="4" y2="5"/><line x1="10" y1="1" x2="10" y2="5"/>
+          <line x1="1" y1="7" x2="14" y2="7"/>
+          <circle cx="15.5" cy="15.5" r="4.5"/>
+        </svg>`}
       </button>
       <div class="flight-card-body">
         ${meta ? `<div class="flight-route-compact">${esc(meta)}</div>` : ''}
