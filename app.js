@@ -648,9 +648,9 @@ async function runCapture() {
 /* ---------------- RENDER: COUNTRIES ---------------- */
 function renderCountries() {
   const el = document.getElementById('countryList');
+  const addCard = '<div class="add-flight-card" onclick="openSmartInput()">＋</div>';
   if (!countries.length) {
-    el.innerHTML = '<div class="empty" style="grid-column:1/-1">No countries yet. '
-      + 'Use "Capture" with something like "Hoi An, Vietnam".</div>';
+    el.innerHTML = addCard;
   } else {
     el.innerHTML = countries.map(c => {
       const n = places.filter(ci => ci.country_id === c.id).length;
@@ -662,7 +662,7 @@ function renderCountries() {
         </div>
         <div class="when">${n} ${n === 1 ? 'place' : 'places'}${daysLabel}</div>
       </div>`;
-    }).join('');
+    }).join('') + addCard;
   }
 }
 
