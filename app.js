@@ -1858,9 +1858,16 @@ async function confirmSmartInput() {
 
   if (result.type === 'flight') {
     const d = result.extractedData || {};
-    const content = [d.origin, d.destination, d.depart_date, d.airline, d.flight_no, d.price]
-      .filter(Boolean).join(' · ') || rawText;
-    await saveSmartResearch(content, _smartImageFile);
+    const f = {
+      trip_id: TRIP_ID, booked: false,
+      origin: d.origin || '', destination: d.destination || '',
+      airline: d.airline || '', flight_no: d.flight_no || '',
+      depart_date: d.depart_date || '', depart_time: d.depart_time || '',
+      price: d.price || '', notes: d.notes || rawText || '',
+    };
+    if (GUEST_MODE) { lsInsert('flights', f); }
+    else { await sb.from('flights').insert(f); }
+    await refreshAll();
     showTab('flights');
     return;
   }
