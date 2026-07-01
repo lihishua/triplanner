@@ -1163,31 +1163,50 @@ let _editingFlightId = null;
 
 function renderFlights() {
   const el = document.getElementById('flightList');
-  if (!flights.length) { el.innerHTML = '<div class="empty">No flights yet.</div>'; return; }
-  el.innerHTML = flights.map(f => `
-    <div class="card" data-id="${f.id}" onclick="editFlight('${f.id}')" style="cursor:pointer">
-      <button class="del" onclick="event.stopPropagation();delFlight('${f.id}')">×</button>
-      <div class="flight-route"><span>${esc(f.origin)||'—'}</span>
-        <span class="arrow"></span><span>${esc(f.destination)||'—'}</span></div>
-      <div class="flight-meta">
-        <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer" onclick="event.stopPropagation()">
-          <input type="checkbox" ${f.booked ? 'checked' : ''} onchange="toggleFlightBooked('${f.id}')">
-          <span>Booked</span>
-        </label>
-        ${f.airline?`<span><b>${esc(f.airline)}</b> ${esc(f.flight_no)||''}</span>`:''}
-        ${f.depart_date?`<span>${esc(f.depart_date)} ${esc(f.depart_time)||''}</span>`:''}
-        ${f.price?`<span class="pill">${esc(f.price)}</span>`:''}
+  const eligible = flights.filter(f => f.origin && f.destination);
+  if (!eligible.length) {
+    el.innerHTML = '<div class="empty">No flights yet. Tap + to add your first leg.</div>';
+    return;
+  }
+  const legs = groupFlightsByLeg(eligible);
+  // Persist any newly seen leg keys
+  const currentKeys = legs.map(l => l.key);
+  const merged = [...legOrder.filter(k => currentKeys.includes(k)),
+                  ...currentKeys.filter(k => !legOrder.includes(k))];
+  if (merged.join() !== legOrder.join()) saveLegOrder(merged);
+
+  el.innerHTML = legs.map(leg => `
+    <div class="leg-group" data-key="${esc(leg.key)}">
+      <div class="leg-header">
+        <span class="leg-label">${esc(leg.originLabel)} → ${esc(leg.destLabel)}</span>
+        <span class="drag-handle" data-key="${esc(leg.key)}" title="Drag to reorder">⠿</span>
       </div>
-      ${f.notes?`<div class="flight-meta" style="margin-top:8px">${esc(f.notes)}</div>`:''}
-    </div>`).join('');
+      <div class="leg-flights">
+        ${leg.flights.map(f => renderFlightCard(f)).join('')}
+      </div>
+    </div>
+  `).join('');
 }
 
-async function toggleFlightBooked(id) {
-  const f = flights.find(x => x.id === id); if (!f) return;
-  f.booked = !f.booked;
-  if (GUEST_MODE) { lsUpdate('flights', id, { booked: f.booked }); }
-  else { await sb.from('flights').update({ booked: f.booked }).eq('id', id); }
-  renderFlights();
+function renderFlightCard(f) {
+  const meta = [f.airline, f.flight_no, f.depart_date, f.depart_time, f.price]
+    .filter(Boolean).join(' · ');
+  return `
+    <div class="card flight-card" data-id="${f.id}">
+      <label class="booked-label" onclick="event.stopPropagation()">
+        <input type="checkbox" ${f.booked ? 'checked' : ''}
+          onchange="toggleFlightBooked('${f.id}', this)">
+        Booked
+      </label>
+      <div class="flight-card-body" onclick="editFlight('${f.id}')">
+        ${meta ? `<div class="flight-route-compact">${esc(meta)}</div>` : ''}
+        ${f.notes ? `<div class="flight-notes">${esc(f.notes)}</div>` : ''}
+      </div>
+      <div class="flight-card-actions">
+        <button class="btn-icon" onclick="event.stopPropagation();editFlight('${f.id}')" title="Edit">✏</button>
+        <button class="del" onclick="event.stopPropagation();delFlight('${f.id}')">×</button>
+      </div>
+    </div>`;
 }
 
 function openFlight() {

@@ -325,6 +325,23 @@
   .si-tab-pill.active{border-color:var(--accent);color:var(--accent);font-weight:600}
   #si-file-label{padding:8px 12px;font-size:20px;cursor:pointer;border:1.5px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;background:none;color:var(--ink-soft)}
   #si-file-label:hover{border-color:var(--accent);color:var(--accent)}
+  /* Flights redesign — leg groups */
+  .leg-group{margin-bottom:24px}
+  .leg-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .leg-label{font-family:'Fraunces',serif;font-size:17px;font-weight:600;color:var(--ink)}
+  .drag-handle{font-size:20px;color:var(--ink-soft);cursor:grab;padding:4px 8px;line-height:1;user-select:none;touch-action:none}
+  .drag-handle:active{cursor:grabbing}
+  .leg-group.dragging{opacity:.45}
+  .leg-group.drag-over .leg-header{outline:2px dashed var(--accent);border-radius:6px}
+  .flight-card{display:flex;align-items:flex-start;gap:12px;padding:14px 16px}
+  .booked-label{display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-size:14px;color:var(--ink-soft);flex-shrink:0}
+  .booked-label input{width:16px;height:16px;cursor:pointer}
+  .flight-card-body{flex:1;min-width:0;cursor:pointer}
+  .flight-route-compact{font-size:15px;color:var(--ink);line-height:1.4}
+  .flight-notes{font-size:13px;color:var(--ink-soft);margin-top:3px;white-space:pre-wrap}
+  .flight-card-actions{display:flex;align-items:center;gap:4px;flex-shrink:0}
+  .btn-icon{background:none;border:none;cursor:pointer;font-size:15px;color:var(--ink-soft);padding:4px 6px;border-radius:6px;line-height:1}
+  .btn-icon:hover{color:var(--accent)}
 </style>
 </head>
 <body>
@@ -429,13 +446,6 @@
       </div>
       <div class="grid flights" id="flightList"></div>
 
-      <div class="research-section">
-        <div class="research-head">
-          <h3>Research</h3>
-          <button class="btn ghost small" onclick="openResearch()">＋ Add note</button>
-        </div>
-        <div class="grid flights" id="researchList"></div>
-      </div>
     </section>
 
     <section class="page" id="page-budget">
