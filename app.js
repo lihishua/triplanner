@@ -1186,6 +1186,7 @@ function renderFlights() {
       </div>
     </div>
   `).join('');
+  initLegDrag();
 }
 
 function renderFlightCard(f) {
@@ -1207,6 +1208,62 @@ function renderFlightCard(f) {
         <button class="del" onclick="event.stopPropagation();delFlight('${f.id}')">×</button>
       </div>
     </div>`;
+}
+
+let _dragKey     = null;
+let _legDragInit = false;
+
+function initLegDrag() {
+  if (_legDragInit) return;
+  _legDragInit = true;
+  const el = document.getElementById('flightList');
+
+  el.addEventListener('dragstart', e => {
+    const handle = e.target.closest('.drag-handle[data-key]');
+    if (!handle) { e.preventDefault(); return; }
+    _dragKey = handle.dataset.key;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', _dragKey);
+    handle.closest('.leg-group')?.classList.add('dragging');
+  });
+
+  el.addEventListener('dragover', e => {
+    if (!_dragKey) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const group = e.target.closest('.leg-group');
+    el.querySelectorAll('.leg-group').forEach(g => g.classList.remove('drag-over'));
+    if (group && group.dataset.key !== _dragKey) group.classList.add('drag-over');
+  });
+
+  el.addEventListener('dragleave', e => {
+    if (!e.relatedTarget || !el.contains(e.relatedTarget)) {
+      el.querySelectorAll('.leg-group').forEach(g => g.classList.remove('drag-over'));
+    }
+  });
+
+  el.addEventListener('drop', async e => {
+    e.preventDefault();
+    const targetGroup = e.target.closest('.leg-group');
+    if (!targetGroup || !_dragKey || targetGroup.dataset.key === _dragKey) {
+      cleanupLegDrag(el); return;
+    }
+    const allKeys = [...el.querySelectorAll('.leg-group')].map(g => g.dataset.key);
+    const fromIdx = allKeys.indexOf(_dragKey);
+    const toIdx   = allKeys.indexOf(targetGroup.dataset.key);
+    allKeys.splice(fromIdx, 1);
+    allKeys.splice(toIdx, 0, _dragKey);
+    cleanupLegDrag(el);
+    await saveLegOrder(allKeys);
+    renderFlights();
+  });
+
+  el.addEventListener('dragend', () => cleanupLegDrag(el));
+}
+
+function cleanupLegDrag(el) {
+  _dragKey = null;
+  el.querySelectorAll('.leg-group').forEach(g => g.classList.remove('dragging', 'drag-over'));
 }
 
 function openFlight() {
