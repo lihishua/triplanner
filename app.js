@@ -1194,20 +1194,17 @@ function renderFlightCard(f) {
   const meta = [f.airline, f.flight_no, f.depart_date, f.depart_time, f.price]
     .filter(Boolean).join(' · ');
   return `
-    <div class="card flight-card" data-id="${f.id}">
-      <label class="booked-label" onclick="event.stopPropagation()">
-        <input type="checkbox" ${f.booked ? 'checked' : ''}
-          onchange="toggleFlightBooked('${f.id}', this)">
-        Booked
-      </label>
-      <div class="flight-card-body" onclick="editFlight('${f.id}')">
+    <div class="card flight-card" data-id="${f.id}" onclick="editFlight('${f.id}')">
+      <button class="booked-btn${f.booked ? ' active' : ''}" data-booked="${f.booked ? 'true' : 'false'}"
+        onclick="event.stopPropagation();toggleFlightBooked('${f.id}', this)"
+        title="${f.booked ? 'Booked' : 'Mark as booked'}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="${f.booked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+      </button>
+      <div class="flight-card-body">
         ${meta ? `<div class="flight-route-compact">${esc(meta)}</div>` : ''}
         ${f.notes ? `<div class="flight-notes">${esc(f.notes)}</div>` : ''}
       </div>
-      <div class="flight-card-actions">
-        <button class="btn-icon" onclick="event.stopPropagation();editFlight('${f.id}')" title="Edit">✏</button>
-        <button class="del" onclick="event.stopPropagation();delFlight('${f.id}')">×</button>
-      </div>
+      <button class="del" onclick="event.stopPropagation();delFlight('${f.id}')">×</button>
     </div>`;
 }
 
@@ -1326,14 +1323,16 @@ async function delFlight(id){
   await sb.from('flights').delete().eq('id', id); await refreshAll();
 }
 
-let _pendingBookId   = null;
-let _pendingBookChkb = null;
+let _pendingBookId  = null;
+let _pendingBookBtn = null;
 
-async function toggleFlightBooked(id, checkbox) {
+async function toggleFlightBooked(id, btn) {
   const f = flights.find(x => x.id === id);
   if (!f) return;
 
-  if (!checkbox.checked) {
+  const newBooked = btn.dataset.booked !== 'true';
+
+  if (!newBooked) {
     // Un-booking: just save, no confirmation
     f.booked = false;
     if (GUEST_MODE) lsUpdate('flights', id, { booked: false });
@@ -1356,8 +1355,8 @@ async function toggleFlightBooked(id, checkbox) {
   }
 
   // Show confirmation
-  _pendingBookId   = id;
-  _pendingBookChkb = checkbox;
+  _pendingBookId  = id;
+  _pendingBookBtn = btn;
   const n = siblings.length;
   document.getElementById('book-confirm-msg').textContent =
     `I'll now delete the other ${n} option${n > 1 ? 's' : ''} for this leg. OK?`;
@@ -1367,7 +1366,7 @@ async function toggleFlightBooked(id, checkbox) {
 async function confirmBookFlight() {
   closeAll();
   const id = _pendingBookId;
-  _pendingBookId = _pendingBookChkb = null;
+  _pendingBookId = _pendingBookBtn = null;
   if (!id) return;
 
   const f = flights.find(x => x.id === id);
@@ -1390,8 +1389,7 @@ async function confirmBookFlight() {
 
 function cancelBookFlight() {
   closeAll();
-  if (_pendingBookChkb) _pendingBookChkb.checked = false;
-  _pendingBookId = _pendingBookChkb = null;
+  _pendingBookId = _pendingBookBtn = null;
 }
 
 /* ---------------- BUDGET ---------------- */
