@@ -765,18 +765,18 @@
   <div id="si-input-state">
     <h3>Add anything</h3>
     <textarea id="si-text" rows="4" placeholder="Paste a link, type a note, describe a flight… anything" style="width:100%;box-sizing:border-box;resize:vertical"></textarea>
+    <label id="si-file-label" title="Attach image" style="margin-top:8px;display:inline-flex">
+      📎
+      <input type="file" id="si-file" accept="image/*" style="display:none" onchange="onSmartImagePick(this)">
+    </label>
     <div id="si-image-preview" style="display:none">
       <img id="si-image-thumb" src="" alt="preview">
       <button id="si-clear-img" onclick="clearSmartImage()" title="Remove image">×</button>
     </div>
     <div id="si-msg"></div>
     <div class="modal-actions" style="gap:8px">
-      <button class="btn ghost" onclick="closeAll()">Cancel</button>
-      <label id="si-file-label" title="Attach image">
-        📎
-        <input type="file" id="si-file" accept="image/*" style="display:none" onchange="onSmartImagePick(this)">
-      </label>
-      <button class="btn" onclick="submitSmartInput()">✓</button>
+      <button class="btn ghost small" onclick="closeAll()">Cancel</button>
+      <button class="btn ghost small" onclick="submitSmartInput()">✓</button>
     </div>
   </div>
 
