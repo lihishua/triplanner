@@ -199,8 +199,7 @@ async function enterTrip(trip) {
   document.getElementById('trip-onboarding').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   renderTripCarousel();
-  await refreshAll();
-  await loadPreferences();
+  await Promise.all([refreshAll(), loadPreferences(), loadLegOrder()]);
   loadUpdateCenter();
 }
 
@@ -1159,6 +1158,7 @@ async function investigate(cityId) {
 }
 
 /* ---------------- FLIGHTS ---------------- */
+let legOrder = []; // ordered array of leg keys like ["TLV-BKK","BKK-SYD"]
 let _editingFlightId = null;
 
 function renderFlights() {
@@ -1395,6 +1395,85 @@ async function saveBudgetTarget(){
 /* ---------------- AIRPORT AUTOCOMPLETE ---------------- */
 // [iata, city, airportName, country, isPrimary]
 const AIRPORTS=[['TLV','Tel Aviv','Ben Gurion International','Israel',1],['VDA','Eilat','Ramon International','Israel',1],['CMB','Colombo','Bandaranaike International','Sri Lanka',1],['GOI','Goa','Manohar International','India',1],['BOM','Mumbai','Chhatrapati Shivaji International','India',1],['DEL','Delhi','Indira Gandhi International','India',1],['BLR','Bangalore','Kempegowda International','India',1],['MAA','Chennai','Chennai International','India',1],['CCU','Kolkata','Netaji Subhas Chandra Bose International','India',1],['HYD','Hyderabad','Rajiv Gandhi International','India',1],['COK','Kochi','Cochin International','India',1],['HAN','Hanoi','Noi Bai International','Vietnam',1],['SGN','Ho Chi Minh City','Tan Son Nhat International','Vietnam',1],['DAD','Da Nang','Da Nang International','Vietnam',1],['BKK','Bangkok','Suvarnabhumi International','Thailand',1],['DMK','Bangkok','Don Mueang International','Thailand',0],['HKT','Phuket','Phuket International','Thailand',1],['CNX','Chiang Mai','Chiang Mai International','Thailand',1],['USM','Koh Samui','Samui Airport','Thailand',1],['DPS','Bali','Ngurah Rai International','Indonesia',1],['CGK','Jakarta','Soekarno-Hatta International','Indonesia',1],['KUL','Kuala Lumpur','KLIA','Malaysia',1],['LGK','Langkawi','Langkawi International','Malaysia',1],['SIN','Singapore','Changi International','Singapore',1],['MNL','Manila','Ninoy Aquino International','Philippines',1],['CEB','Cebu','Mactan-Cebu International','Philippines',1],['NRT','Tokyo','Narita International','Japan',1],['HND','Tokyo','Haneda International','Japan',0],['KIX','Osaka','Kansai International','Japan',1],['FUK','Fukuoka','Fukuoka Airport','Japan',1],['OKA','Okinawa','Naha Airport','Japan',1],['ICN','Seoul','Incheon International','South Korea',1],['GMP','Seoul','Gimpo International','South Korea',0],['PEK','Beijing','Capital International','China',1],['PVG','Shanghai','Pudong International','China',1],['SHA','Shanghai','Hongqiao International','China',0],['CAN','Guangzhou','Baiyun International','China',1],['TPE','Taipei','Taiwan Taoyuan International','Taiwan',1],['PNH','Phnom Penh','Phnom Penh International','Cambodia',1],['REP','Siem Reap','Siem Reap International','Cambodia',1],['KTM','Kathmandu','Tribhuvan International','Nepal',1],['MLE','Male','Velana International','Maldives',1],['DXB','Dubai','Dubai International','UAE',1],['AUH','Abu Dhabi','Zayed International','UAE',1],['SHJ','Sharjah','Sharjah International','UAE',1],['DOH','Doha','Hamad International','Qatar',1],['MCT','Muscat','Muscat International','Oman',1],['AMM','Amman','Queen Alia International','Jordan',1],['IST','Istanbul','Istanbul Airport','Turkey',1],['SAW','Istanbul','Sabiha Gokcen International','Turkey',0],['AYT','Antalya','Antalya Airport','Turkey',1],['CAI','Cairo','Cairo International','Egypt',1],['SSH','Sharm el-Sheikh','Sharm el-Sheikh International','Egypt',1],['HRG','Hurghada','Hurghada International','Egypt',1],['CMN','Casablanca','Mohammed V International','Morocco',1],['RAK','Marrakech','Menara Airport','Morocco',1],['ADD','Addis Ababa','Bole International','Ethiopia',1],['NBO','Nairobi','Jomo Kenyatta International','Kenya',1],['DAR','Dar es Salaam','Julius Nyerere International','Tanzania',1],['ZNZ','Zanzibar','Abeid Amani Karume International','Tanzania',1],['JNB','Johannesburg','OR Tambo International','South Africa',1],['CPT','Cape Town','Cape Town International','South Africa',1],['LHR','London','Heathrow Airport','UK',1],['LGW','London','Gatwick Airport','UK',0],['STN','London','Stansted Airport','UK',0],['MAN','Manchester','Manchester Airport','UK',1],['EDI','Edinburgh','Edinburgh Airport','UK',1],['CDG','Paris','Charles de Gaulle Airport','France',1],['ORY','Paris','Orly Airport','France',0],['NCE','Nice','Nice Côte d\'Azur Airport','France',1],['FRA','Frankfurt','Frankfurt Airport','Germany',1],['MUC','Munich','Munich Airport','Germany',1],['BER','Berlin','Berlin Brandenburg Airport','Germany',1],['MAD','Madrid','Adolfo Suárez Madrid-Barajas','Spain',1],['BCN','Barcelona','El Prat Airport','Spain',1],['AGP','Málaga','Costa del Sol Airport','Spain',1],['PMI','Palma de Mallorca','Son Sant Joan Airport','Spain',1],['IBZ','Ibiza','Ibiza Airport','Spain',1],['FCO','Rome','Fiumicino Airport','Italy',1],['MXP','Milan','Malpensa Airport','Italy',1],['VCE','Venice','Marco Polo Airport','Italy',1],['FLR','Florence','Peretola Airport','Italy',1],['NAP','Naples','Naples International','Italy',1],['ATH','Athens','Eleftherios Venizelos','Greece',1],['HER','Heraklion','Nikos Kazantzakis Airport','Greece',1],['RHO','Rhodes','Diagoras Airport','Greece',1],['CFU','Corfu','Ioannis Kapodistrias Airport','Greece',1],['JMK','Mykonos','Mykonos Airport','Greece',1],['LIS','Lisbon','Humberto Delgado Airport','Portugal',1],['OPO','Porto','Francisco de Sá Carneiro','Portugal',1],['FAO','Faro','Faro Airport','Portugal',1],['AMS','Amsterdam','Amsterdam Schiphol','Netherlands',1],['ZRH','Zurich','Zurich Airport','Switzerland',1],['GVA','Geneva','Geneva Airport','Switzerland',1],['VIE','Vienna','Vienna International','Austria',1],['SPU','Split','Split Airport','Croatia',1],['DBV','Dubrovnik','Dubrovnik Airport','Croatia',1],['PRG','Prague','Václav Havel Airport','Czech Republic',1],['BUD','Budapest','Ferenc Liszt Airport','Hungary',1],['WAW','Warsaw','Chopin Airport','Poland',1],['KEF','Reykjavik','Keflavik International','Iceland',1],['OSL','Oslo','Gardermoen Airport','Norway',1],['ARN','Stockholm','Arlanda Airport','Sweden',1],['CPH','Copenhagen','Copenhagen Airport','Denmark',1],['HEL','Helsinki','Helsinki Airport','Finland',1],['DUB','Dublin','Dublin Airport','Ireland',1],['BRU','Brussels','Brussels Airport','Belgium',1],['JFK','New York','John F. Kennedy International','USA',1],['EWR','New York','Newark Liberty International','USA',0],['LGA','New York','LaGuardia Airport','USA',0],['LAX','Los Angeles','Los Angeles International','USA',1],['ORD','Chicago','O\'Hare International','USA',1],['ATL','Atlanta','Hartsfield-Jackson International','USA',1],['DFW','Dallas','Dallas/Fort Worth International','USA',1],['SFO','San Francisco','San Francisco International','USA',1],['MIA','Miami','Miami International','USA',1],['LAS','Las Vegas','Harry Reid International','USA',1],['MCO','Orlando','Orlando International','USA',1],['YYZ','Toronto','Pearson International','Canada',1],['YVR','Vancouver','Vancouver International','Canada',1],['CUN','Cancún','Cancún International','Mexico',1],['MEX','Mexico City','Benito Juárez International','Mexico',1],['GRU','São Paulo','Guarulhos International','Brazil',1],['GIG','Rio de Janeiro','Galeão International','Brazil',1],['EZE','Buenos Aires','Ministro Pistarini International','Argentina',1],['BOG','Bogotá','El Dorado International','Colombia',1],['LIM','Lima','Jorge Chávez International','Peru',1],['SCL','Santiago','Arturo Merino Benítez International','Chile',1],['SYD','Sydney','Kingsford Smith Airport','Australia',1],['MEL','Melbourne','Tullamarine Airport','Australia',1],['BNE','Brisbane','Brisbane Airport','Australia',1],['AKL','Auckland','Auckland Airport','New Zealand',1],['SVO','Moscow','Sheremetyevo International','Russia',1],['TBS','Tbilisi','Tbilisi International','Georgia',1],['EVN','Yerevan','Zvartnots International','Armenia',1],['TAS','Tashkent','Tashkent International','Uzbekistan',1],['SEZ','Mahé','Seychelles International','Seychelles',1],['MRU','Mauritius','Sir Seewoosagur Ramgoolam International','Mauritius',1],['RGN','Yangon','Yangon International','Myanmar',1],['RUH','Riyadh','King Khalid International','Saudi Arabia',1],['JED','Jeddah','King Abdulaziz International','Saudi Arabia',1],['HAV','Havana','José Martí International','Cuba',1]];
+
+const IATA_LON = {
+  LHR:  -0.5, CDG:   2.5, FRA:   8.7, AMS:   4.8, MAD:  -3.7, BCN:   2.1,
+  FCO:  12.2, ATH:  23.7, IST:  28.8, TLV:  34.9, AMM:  35.9, CAI:  31.4,
+  JED:  39.2, RUH:  46.7, DOH:  51.6, DXB:  55.4, AUH:  54.4, SHJ:  55.5,
+  MCT:  58.3, KTM:  85.4, CCU:  88.4, DEL:  77.1, BOM:  72.9, GOI:  73.8,
+  HYD:  78.5, BLR:  77.7, MAA:  80.3, COK:  76.3, CMB:  79.9,
+  RGN:  96.1, BKK: 100.7, DMK: 100.6, HKT:  98.3, CNX:  99.0, USM: 100.1,
+  KUL: 101.7, LGK:  99.7, SIN: 103.9, PNH: 104.8, REP: 103.8,
+  SGN: 106.7, HAN: 105.8, DAD: 108.2, CGK: 106.7, DPS: 115.2,
+  MNL: 121.0, CEB: 124.0, TPE: 121.2,
+  ICN: 126.4, GMP: 126.8, OKA: 127.6, FUK: 130.5, KIX: 135.4,
+  HND: 139.8, NRT: 140.4, MEL: 144.8, SYD: 151.2, BNE: 153.0, AKL: 174.8,
+  JFK: -73.8, EWR: -74.2, LAX: -118.4, SFO: -122.4, ORD: -87.9,
+};
+
+function resolveIata(s) {
+  if (!s) return '';
+  const up = s.trim().toUpperCase();
+  if (AIRPORTS.find(a => a[0] === up)) return up;
+  const low = s.toLowerCase().trim();
+  const match = AIRPORTS.find(a =>
+    a[1].toLowerCase() === low ||
+    a[2].toLowerCase().includes(low) ||
+    low.includes(a[1].toLowerCase())
+  );
+  return match ? match[0] : up;
+}
+
+function legKey(origin, dest) {
+  return resolveIata(origin) + '-' + resolveIata(dest);
+}
+
+function iataLabel(iata) {
+  const airport = AIRPORTS.find(a => a[0] === iata);
+  if (!airport) return iata;
+  return airport[3] + ' (' + iata + ')';
+}
+
+function groupFlightsByLeg(fs) {
+  const map = new Map();
+  for (const f of fs) {
+    const key = legKey(f.origin, f.destination);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(f);
+  }
+  for (const arr of map.values()) {
+    arr.sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
+  }
+  const savedKeys = legOrder.filter(k => map.has(k));
+  const newKeys = [...map.keys()].filter(k => !legOrder.includes(k));
+  newKeys.sort((a, b) => (IATA_LON[a.split('-')[0]] ?? 0) - (IATA_LON[b.split('-')[0]] ?? 0));
+  return [...savedKeys, ...newKeys].map(key => {
+    const [originIata, destIata] = key.split('-');
+    return { key, originIata, destIata,
+      originLabel: iataLabel(originIata), destLabel: iataLabel(destIata),
+      flights: map.get(key) || [] };
+  });
+}
+
+async function saveLegOrder(order) {
+  legOrder = order;
+  const json = JSON.stringify(order);
+  if (GUEST_MODE) {
+    localStorage.setItem('triplanner_leg_order_' + TRIP_ID, json);
+    return;
+  }
+  await sb.from('trips').update({ leg_order: json }).eq('id', TRIP_ID);
+}
+
+async function loadLegOrder() {
+  if (GUEST_MODE) {
+    const raw = localStorage.getItem('triplanner_leg_order_' + TRIP_ID);
+    legOrder = raw ? JSON.parse(raw) : [];
+    return;
+  }
+  const { data } = await sb.from('trips').select('leg_order').eq('id', TRIP_ID).single();
+  legOrder = data?.leg_order ? JSON.parse(data.leg_order) : [];
+}
 
 function searchAirports(q, limit = 7) {
   const s = q.toLowerCase().trim();
@@ -1733,6 +1812,7 @@ async function saveSmartTodo(text, category) {
 /* ---------------- FLIGHT RESEARCH ---------------- */
 function renderResearch() {
   const el = document.getElementById('researchList');
+  if (!el) return;
   if (!research.length) {
     el.innerHTML = '<div class="empty">Nothing saved yet. Add notes, screenshots or links about flights you\'re considering.</div>';
     return;
