@@ -1254,8 +1254,8 @@ function initLegDrag() {
     allKeys.splice(fromIdx, 1);
     allKeys.splice(toIdx, 0, _dragKey);
     cleanupLegDrag(el);
-    renderFlights();
     saveLegOrder(allKeys);
+    renderFlights();
   });
 
   el.addEventListener('dragend', () => cleanupLegDrag(el));
