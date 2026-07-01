@@ -2223,37 +2223,13 @@ function zoomResearchImage(url) {
 /* ---------------- TRIP PREVIEW (Mapbox globe animation) ---------------- */
 
 function chainFlightsAsRoute(fs) {
-  if (fs.length <= 1) return fs;
-
-  const norm = s => (s || '').toLowerCase().trim();
-
-  // Sort by date, empty dates go last so undated legs don't steal the start
-  const byDate = [...fs].sort((a, b) => {
-    const da = a.depart_date || '￿';
-    const db = b.depart_date || '￿';
-    return da.localeCompare(db);
-  });
-
-  // Find the leg whose origin is not the destination of any other leg
-  const allDests = new Set(fs.map(f => norm(f.destination)));
-  const starts   = byDate.filter(f => !allDests.has(norm(f.origin)));
-  const seed     = starts.length ? starts[0] : byDate[0];
-
-  const chain     = [seed];
-  const remaining = byDate.filter(f => f !== seed);
-
-  while (remaining.length) {
-    const last = chain[chain.length - 1];
-    const idx  = remaining.findIndex(f => norm(f.origin) === norm(last.destination));
-    if (idx !== -1) {
-      chain.push(remaining.splice(idx, 1)[0]);
-    } else {
-      // No direct connection — append the rest in date order
-      chain.push(...remaining.splice(0));
-    }
-  }
-
-  return chain;
+  if (!fs.length) return [];
+  // Group by leg (respects saved legOrder, falls back to west→east)
+  const legs = groupFlightsByLeg(fs);
+  // One representative flight per leg: booked one if available, else first by created_at
+  return legs
+    .map(leg => leg.flights.find(f => f.booked) || leg.flights[0])
+    .filter(Boolean);
 }
 
 async function previewTrip() {
