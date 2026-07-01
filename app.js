@@ -199,7 +199,8 @@ async function enterTrip(trip) {
   document.getElementById('trip-onboarding').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   renderTripCarousel();
-  await Promise.all([refreshAll(), loadPreferences(), loadLegOrder()]);
+  await loadLegOrder();
+  await Promise.all([refreshAll(), loadPreferences()]);
   loadUpdateCenter();
 }
 
