@@ -970,6 +970,14 @@ function openCountry(id) {
   openOverlay('ov-detail');
 }
 
+function saveAndCloseDetail() {
+  if (document.activeElement && document.activeElement !== document.body) {
+    document.activeElement.blur();
+  }
+  closeAll();
+  renderCountries();
+}
+
 async function saveCountryDays(countryId, val) {
   const days = parseFloat(val) || null;
   const country = countries.find(c => c.id === countryId);
@@ -977,6 +985,7 @@ async function saveCountryDays(countryId, val) {
   country.planned_days = days;
   if (GUEST_MODE) { lsUpdate('countries', countryId, { planned_days: days }); }
   else await sb.from('countries').update({ planned_days: days }).eq('id', countryId);
+  renderCountries();
   openCountry(countryId);
 }
 
