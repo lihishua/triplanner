@@ -13,7 +13,7 @@ let places = [];
 let flights = [];
 let hotels = [];
 let expenses = [];
-let budgetTarget = null;
+let budgetPlanned = { oneoff: null, contingency: null };
 let research = [];
 let previewMapInstance = null;
 let _researchImageFile     = null;
@@ -200,7 +200,7 @@ async function enterTrip(trip) {
   document.getElementById('app').style.display = 'block';
   renderTripCarousel();
   await loadLegOrder();
-  await Promise.all([refreshAll(), loadPreferences()]);
+  await Promise.all([refreshAll(), loadPreferences(), loadBudgetPlanned()]);
   loadUpdateCenter();
 }
 
@@ -341,30 +341,27 @@ async function refreshAll() {
     const allFlights   = lsGet('flights');
     const allHotels    = lsGet('hotels');
     const allExpenses  = lsGet('expenses');
-    const allBudget    = lsGet('budget_settings');
     countries    = allCountries.filter(r => r.trip_id === TRIP_ID);
     places       = allCities.filter(r => r.trip_id === TRIP_ID);
     flights      = allFlights.filter(r => r.trip_id === TRIP_ID);
     hotels       = allHotels.filter(r => r.trip_id === TRIP_ID);
     expenses     = allExpenses.filter(r => r.trip_id === TRIP_ID)
                               .sort((a,b) => (b.spent_on||'').localeCompare(a.spent_on||''));
-    budgetTarget = allBudget.find(r => r.trip_id === TRIP_ID) || null;
     research     = lsGet('flight_research').filter(r => r.trip_id === TRIP_ID)
                               .sort((a,b) => b.created_at.localeCompare(a.created_at));
     renderCountries(); renderFlights(); renderResearch(); renderBudget();
     return;
   }
-  const [c, ci, f, h, ex, bs, res] = await Promise.all([
+  const [c, ci, f, h, ex, res] = await Promise.all([
     sb.from('countries').select('*').eq('trip_id', TRIP_ID).order('created_at'),
     sb.from('places').select('*').eq('trip_id', TRIP_ID).order('created_at'),
     sb.from('flights').select('*').eq('trip_id', TRIP_ID).order('created_at'),
     sb.from('hotels').select('*').eq('trip_id', TRIP_ID).order('created_at'),
     sb.from('expenses').select('*').eq('trip_id', TRIP_ID).order('spent_on', { ascending: false }),
-    sb.from('budget_settings').select('*').eq('trip_id', TRIP_ID).maybeSingle(),
     sb.from('flight_research').select('*').eq('trip_id', TRIP_ID).order('created_at', { ascending: false }),
   ]);
   countries = c.data || []; places = ci.data || []; flights = f.data || []; hotels = h.data || [];
-  expenses = ex.data || []; budgetTarget = bs.data || null; research = res.data || [];
+  expenses = ex.data || []; research = res.data || [];
   renderCountries(); renderFlights(); renderResearch(); renderBudget();
 }
 
@@ -746,6 +743,55 @@ async function loadPreferences() {
   }
   const { data } = await sb.from('trips').select('preferences').eq('id', TRIP_ID).single();
   tripPreferences = { likes: [], dislikes: [], notes: '', nationality: '', ...(data?.preferences || {}) };
+}
+
+async function loadBudgetPlanned() {
+  if (!TRIP_ID) return;
+  if (GUEST_MODE) {
+    const raw = localStorage.getItem('triplanner_budget_planned_' + TRIP_ID);
+    budgetPlanned = raw ? JSON.parse(raw) : { oneoff: null, contingency: null };
+    return;
+  }
+  const { data } = await sb.from('trips')
+    .select('oneoff_budget,contingency_budget').eq('id', TRIP_ID).single();
+  budgetPlanned = {
+    oneoff: data?.oneoff_budget ?? null,
+    contingency: data?.contingency_budget ?? null,
+  };
+}
+
+async function saveOneoffBudget(val) {
+  const n = parseFloat(val) || null;
+  budgetPlanned.oneoff = n;
+  if (GUEST_MODE) {
+    localStorage.setItem('triplanner_budget_planned_' + TRIP_ID, JSON.stringify(budgetPlanned));
+  } else {
+    await sb.from('trips').update({ oneoff_budget: n }).eq('id', TRIP_ID);
+  }
+  renderBudget();
+}
+
+async function saveContingencyBudget(val) {
+  const n = parseFloat(val) || null;
+  budgetPlanned.contingency = n;
+  if (GUEST_MODE) {
+    localStorage.setItem('triplanner_budget_planned_' + TRIP_ID, JSON.stringify(budgetPlanned));
+  } else {
+    await sb.from('trips').update({ contingency_budget: n }).eq('id', TRIP_ID);
+  }
+  renderBudget();
+}
+
+async function saveDailyBudget(countryId, val) {
+  const n = parseFloat(val) || null;
+  const c = countries.find(x => x.id === countryId);
+  if (c) c.daily_budget = n;
+  if (GUEST_MODE) {
+    lsUpdate('countries', countryId, { daily_budget: n });
+  } else {
+    await sb.from('countries').update({ daily_budget: n }).eq('id', countryId);
+  }
+  renderBudget();
 }
 
 async function suggestItinerary() {
