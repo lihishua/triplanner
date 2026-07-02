@@ -82,7 +82,7 @@ function enterAsGuest(persist = true) {
   const logoutBtn = document.getElementById('logout-btn');
   logoutBtn.title = 'Exit guest';
   logoutBtn.setAttribute('aria-label', 'Exit guest');
-  refreshAll();
+  refreshAll().then(() => { loadBudgetPlanned().then(() => renderBudget()); });
 }
 
 async function doLogin() {
@@ -985,7 +985,7 @@ async function saveCountryDays(countryId, val) {
   country.planned_days = days;
   if (GUEST_MODE) { lsUpdate('countries', countryId, { planned_days: days }); }
   else await sb.from('countries').update({ planned_days: days }).eq('id', countryId);
-  renderCountries();
+  renderCountries(); renderBudget();
   openCountry(countryId);
 }
 
@@ -1387,8 +1387,8 @@ async function saveFlight() {
 }
 
 async function delFlight(id){
-  if (GUEST_MODE) { lsDelete('flights', id); await refreshAll(); return; }
-  await sb.from('flights').delete().eq('id', id); await refreshAll();
+  if (GUEST_MODE) { lsDelete('flights', id); await refreshAll(); renderBudget(); return; }
+  await sb.from('flights').delete().eq('id', id); await refreshAll(); renderBudget();
 }
 
 let _pendingBookId  = null;
@@ -1405,7 +1405,7 @@ async function toggleFlightBooked(id, btn) {
     f.booked = false;
     if (GUEST_MODE) lsUpdate('flights', id, { booked: false });
     else await sb.from('flights').update({ booked: false }).eq('id', id);
-    renderFlights();
+    renderFlights(); renderBudget();
     return;
   }
 
@@ -1418,7 +1418,7 @@ async function toggleFlightBooked(id, btn) {
     f.booked = true;
     if (GUEST_MODE) lsUpdate('flights', id, { booked: true });
     else await sb.from('flights').update({ booked: true }).eq('id', id);
-    renderFlights();
+    renderFlights(); renderBudget();
     return;
   }
 
@@ -1452,7 +1452,7 @@ async function confirmBookFlight() {
   if (GUEST_MODE) lsUpdate('flights', id, { booked: true });
   else await sb.from('flights').update({ booked: true }).eq('id', id);
 
-  await refreshAll();
+  await refreshAll(); renderBudget();
 }
 
 function cancelBookFlight() {
