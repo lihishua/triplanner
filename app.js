@@ -1208,6 +1208,7 @@ async function investigate(cityId) {
 /* ---------------- FLIGHTS ---------------- */
 let legOrder = []; // ordered array of leg keys like ["TLV-BKK","BKK-SYD"]
 let _editingFlightId = null;
+let _editingExpenseId = null;
 
 function renderFlights() {
   const el = document.getElementById('flightList');
@@ -1661,60 +1662,88 @@ function toggleCountrySection(countryId) {
   renderBudget();
 }
 
-function openExpense(){
-  ['label','amount','currency','notes'].forEach(k=>document.getElementById('e-'+k).value='');
-  document.getElementById('e-currency').value = 'USD';
-  document.getElementById('e-category').value = 'Other';
-  document.getElementById('e-date').value = new Date().toISOString().slice(0,10);
-  const sel = document.getElementById('e-country');
-  sel.innerHTML = '<option value="">— none —</option>' +
-    countries.map(c=>`<option value="${c.id}">${esc(c.flag||'')} ${esc(c.name)}</option>`).join('');
+function openExpense(drawer, countryId) {
+  _editingExpenseId = null;
+  document.getElementById('e-title').textContent = 'Add expense';
+  document.getElementById('e-label').value = '';
+  document.getElementById('e-amount').value = '';
+  document.getElementById('e-drawer').value = drawer || 'oneoff';
+  document.getElementById('e-country-id').value = countryId || '';
+  document.getElementById('e-id').value = '';
   openOverlay('ov-expense');
 }
-async function saveExpense(){
-  const amount = parseFloat(val('e-amount'));
-  if(isNaN(amount)){ alert('Enter an amount.'); return; }
-  const row = {
-    trip_id: TRIP_ID,
-    label: val('e-label').trim() || 'Expense',
-    amount,
-    currency: (val('e-currency').trim() || 'USD').toUpperCase(),
-    category: val('e-category'),
-    spent_on: val('e-date') || null,
-    country_id: val('e-country') || null,
-    notes: val('e-notes').trim() || null,
-  };
-  if (GUEST_MODE) { lsInsert('expenses', row); closeAll(); await refreshAll(); return; }
-  const { error } = await sb.from('expenses').insert(row);
-  if(error) return alert(error.message);
-  closeAll(); await refreshAll();
-}
-async function delExpense(id){
-  if (GUEST_MODE) { lsDelete('expenses', id); await refreshAll(); return; }
-  await sb.from('expenses').delete().eq('id', id); await refreshAll();
+
+function editExpense(id) {
+  const e = expenses.find(x => x.id === id);
+  if (!e) return;
+  _editingExpenseId = id;
+  document.getElementById('e-title').textContent = 'Edit expense';
+  document.getElementById('e-label').value = e.label || '';
+  document.getElementById('e-amount').value = e.amount || '';
+  document.getElementById('e-drawer').value = e.drawer || 'oneoff';
+  document.getElementById('e-country-id').value = e.country_id || '';
+  document.getElementById('e-id').value = id;
+  openOverlay('ov-expense');
 }
 
-function openBudgetTarget(){
-  document.getElementById('t-total').value = '';
-  document.getElementById('t-currency').value = 'USD';
-  openOverlay('ov-target');
-}
-async function saveBudgetTarget(){
-  const row = {
-    trip_id: TRIP_ID,
-    total_budget: parseFloat(val('t-total')) || null,
-    base_currency: (val('t-currency').trim() || 'USD').toUpperCase(),
-  };
-  if (GUEST_MODE) {
-    const existing = lsGet('budget_settings').find(r => r.trip_id === TRIP_ID);
-    if (existing) lsUpdate('budget_settings', existing.id, row);
-    else lsInsert('budget_settings', row);
-    closeAll(); await refreshAll();
-    return;
+async function saveExpense() {
+  const label = document.getElementById('e-label').value.trim() || 'Expense';
+  const amount = parseFloat(document.getElementById('e-amount').value);
+  if (isNaN(amount) || amount <= 0) { alert('Enter a valid amount.'); return; }
+  const drawer = document.getElementById('e-drawer').value || 'oneoff';
+  const countryId = document.getElementById('e-country-id').value || null;
+  const row = { trip_id: TRIP_ID, label, amount, drawer, country_id: countryId };
+
+  if (_editingExpenseId) {
+    if (GUEST_MODE) lsUpdate('expenses', _editingExpenseId, row);
+    else await sb.from('expenses').update(row).eq('id', _editingExpenseId);
+  } else {
+    if (GUEST_MODE) lsInsert('expenses', row);
+    else {
+      const { error } = await sb.from('expenses').insert(row);
+      if (error) { alert(error.message); return; }
+    }
   }
-  const { error } = await sb.from('budget_settings').upsert(row);
-  if(error) return alert(error.message);
-  closeAll(); await refreshAll();
+  _editingExpenseId = null;
+  closeAll();
+  await refreshAll();
+  renderBudget();
+}
+
+async function delExpense(id) {
+  if (GUEST_MODE) { lsDelete('expenses', id); await refreshAll(); renderBudget(); return; }
+  await sb.from('expenses').delete().eq('id', id);
+  await refreshAll();
+  renderBudget();
+}
+
+function startEditPlanned(type, countryId, el) {
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.className = 'inline-planned-input';
+  input.placeholder = '0';
+  input.min = '0';
+  input.step = 'any';
+  if (type === 'daily' && countryId) {
+    const c = countries.find(x => x.id === countryId);
+    input.value = c?.daily_budget || '';
+  } else if (type === 'oneoff') {
+    input.value = budgetPlanned.oneoff || '';
+  } else {
+    input.value = budgetPlanned.contingency || '';
+  }
+  el.replaceWith(input);
+  input.focus();
+  input.select();
+
+  const save = () => {
+    const val = input.value.trim();
+    if (type === 'daily' && countryId) saveDailyBudget(countryId, val);
+    else if (type === 'oneoff') saveOneoffBudget(val);
+    else saveContingencyBudget(val);
+  };
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } });
 }
 
 /* ---------------- AIRPORT AUTOCOMPLETE ---------------- */
