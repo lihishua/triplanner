@@ -14,11 +14,9 @@ Replace the flat expense list + category breakdown with a three-drawer envelope 
 
 One-time costs that don't repeat daily. Booked flights are **auto-imported** as read-only line items (pulled from the `flights` table where `booked = true` and `price` is non-empty). The user can add additional manual entries (tour pre-paid, gear, visa fee, etc.).
 
-- **Planned** = sum of all line items (auto + manual)
-- **Actual** = same line items (no separate actual for one-offs — the expense IS the actual)
-- Planned and actual are therefore always equal for this drawer; the value is seeing the itemised list and knowing the fixed commitment
-
-> **Note:** Because planned = actual here, the progress bar is omitted for this drawer. It shows only the itemised list and a total.
+- **Planned** = a number the user sets manually (stored in `trips.oneoff_budget`). Defaults to empty/unset.
+- **Actual** = sum of all logged line items (auto-imported flights + manual entries)
+- Progress bar shows actual / planned when planned is set; omitted if no planned amount set yet
 
 ### 2. Daily Budget
 **Icon:** sun SVG (stroke, 20×20)
@@ -108,7 +106,8 @@ Every expense entry (in drawers 1 manual, 2, and 3) shares the same row layout:
 -- Add daily budget rate to countries
 ALTER TABLE countries ADD COLUMN IF NOT EXISTS daily_budget NUMERIC;
 
--- Add contingency planned amount to trips
+-- Add planned amounts to trips
+ALTER TABLE trips ADD COLUMN IF NOT EXISTS oneoff_budget NUMERIC;
 ALTER TABLE trips ADD COLUMN IF NOT EXISTS contingency_budget NUMERIC;
 
 -- Repurpose existing expenses table with drawer tagging
@@ -199,7 +198,7 @@ The modal does **not** show a drawer or country picker — those are set by whic
 ## Inline Editing for Rates and Contingency
 
 - **Daily rate per country**: shown inline in the country header as a tappable number. Tap → small input appears in place, blur/enter saves to `countries.daily_budget`.
-- **Contingency planned**: shown as a tappable number below the drawer header. Same inline-edit pattern.
+- **One-off planned** and **Contingency planned**: both shown as tappable numbers below their drawer headers. Tap → inline input, blur/enter saves to `trips.oneoff_budget` / `trips.contingency_budget`.
 
 ---
 
