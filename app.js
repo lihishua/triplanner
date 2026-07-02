@@ -201,6 +201,7 @@ async function enterTrip(trip) {
   renderTripCarousel();
   await loadLegOrder();
   await Promise.all([refreshAll(), loadPreferences(), loadBudgetPlanned()]);
+  renderBudget();
   loadUpdateCenter();
 }
 
@@ -349,7 +350,7 @@ async function refreshAll() {
                               .sort((a,b) => (b.spent_on||'').localeCompare(a.spent_on||''));
     research     = lsGet('flight_research').filter(r => r.trip_id === TRIP_ID)
                               .sort((a,b) => b.created_at.localeCompare(a.created_at));
-    renderCountries(); renderFlights(); renderResearch(); renderBudget();
+    renderCountries(); renderFlights(); renderResearch();
     return;
   }
   const [c, ci, f, h, ex, res] = await Promise.all([
@@ -362,7 +363,7 @@ async function refreshAll() {
   ]);
   countries = c.data || []; places = ci.data || []; flights = f.data || []; hotels = h.data || [];
   expenses = ex.data || []; research = res.data || [];
-  renderCountries(); renderFlights(); renderResearch(); renderBudget();
+  renderCountries(); renderFlights(); renderResearch();
 }
 
 async function ensureCountry(name, flag) {
@@ -1450,7 +1451,11 @@ function cancelBookFlight() {
 }
 
 /* ---------------- BUDGET ---------------- */
-const CATEGORIES = ['Flights','Lodging','Food','Transport','Activities','Nanny','Other'];
+const _collapsedCountries = new Set();
+
+function fmt(n) {
+  return '$' + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
+}
 
 function fmtMoney(n, cur){
   const v = Number(n||0).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:2});
@@ -1464,81 +1469,201 @@ function parsePrice(str) {
   return Number.isFinite(n) ? n : null;
 }
 
-function renderBookedFlightsLine() {
-  const el = document.getElementById('bookedFlightsLine');
+
+function bookedFlightSum() {
+  return flights.filter(f => f.booked)
+    .map(f => parsePrice(f.price)).filter(n => n !== null)
+    .reduce((s, n) => s + n, 0);
+}
+
+function renderBudget() {
+  _renderBudgetSummaryBar();
+  _renderOneoffDrawer();
+  _renderDailyDrawer();
+  _renderContingencyDrawer();
+}
+
+function _renderBudgetSummaryBar() {
+  const el = document.getElementById('budget-summary-bar');
   if (!el) return;
-  const booked = flights.filter(f => f.booked);
-  if (!booked.length) { el.innerHTML = ''; return; }
-  const parsed = booked.map(f => parsePrice(f.price)).filter(n => n !== null);
-  const sum = parsed.reduce((s, n) => s + n, 0);
-  const symbol = (booked.find(f => f.price?.includes('$'))) ? '$'
-    : (booked.find(f => f.price?.includes('€'))) ? '€'
-    : (booked.find(f => f.price?.includes('£'))) ? '£' : '';
-  const unparsed = booked.length - parsed.length;
-  el.innerHTML = `<div class="catwrap" style="margin-bottom:16px">
-    <div class="catrow"><span class="cname">Booked flights</span>
-      <span style="flex:1;color:var(--ink-soft);font-size:14px">
-        ${booked.length} flight${booked.length === 1 ? '' : 's'} marked booked
-        ${unparsed ? ` · ${unparsed} without a clear price` : ''}
-      </span>
-      <span class="camt">${symbol}${sum.toLocaleString(undefined,{maximumFractionDigits:2})}</span>
+  const oneoffActual = bookedFlightSum() +
+    expenses.filter(e => e.drawer === 'oneoff').reduce((s, e) => s + Number(e.amount || 0), 0);
+  const dailyActual = expenses.filter(e => e.drawer === 'daily').reduce((s, e) => s + Number(e.amount || 0), 0);
+  const contActual = expenses.filter(e => e.drawer === 'contingency').reduce((s, e) => s + Number(e.amount || 0), 0);
+  const totalActual = oneoffActual + dailyActual + contActual;
+  const dailyPlanned = countries.reduce((s, c) =>
+    s + Number(c.daily_budget || 0) * Number(c.planned_days || 0), 0);
+  const totalPlanned = Number(budgetPlanned.oneoff || 0) + dailyPlanned + Number(budgetPlanned.contingency || 0);
+  const hasPlan = totalPlanned > 0;
+  const pct = hasPlan ? Math.min(100, Math.round(totalActual / totalPlanned * 100)) : 0;
+  const over = hasPlan && totalActual > totalPlanned;
+  el.innerHTML = `<div class="budget-summary-bar">
+    <div class="bsb-row">
+      <span class="bsb-label">Total spent</span>
+      <span class="bsb-amounts">${fmt(totalActual)}${hasPlan ? ' of ' + fmt(totalPlanned) : ''}</span>
     </div>
+    ${hasPlan ? `<div class="bsb-meter"><div class="bsb-fill${over ? ' over' : ''}" style="width:${pct}%"></div></div>` : ''}
   </div>`;
 }
 
-function renderBudget(){
-  const baseCur = budgetTarget?.base_currency || (expenses[0]?.currency) || 'USD';
-  const total = expenses.reduce((s,e)=>s + Number(e.amount||0), 0);
-  const target = budgetTarget?.total_budget ? Number(budgetTarget.total_budget) : null;
+function _renderPlannedEdit(type, currentVal, countryId) {
+  if (currentVal != null && currentVal !== '') {
+    return `<span class="budget-planned-edit" onclick="startEditPlanned('${type}','${countryId || ''}',this)"
+      title="Tap to edit planned">planned ${fmt(currentVal)}</span>`;
+  }
+  return `<span class="budget-planned-edit" onclick="startEditPlanned('${type}','${countryId || ''}',this)"
+    title="Set planned amount">set planned</span>`;
+}
 
-  renderBookedFlightsLine();
-
-  const sum = document.getElementById('budgetSummary');
-  let pct = target ? Math.min(100, Math.round(total/target*100)) : 0;
-  const over = target && total > target;
-  sum.innerHTML = `<div class="budget-bar">
-    <div class="nums">
-      <div class="spent">${fmtMoney(total, baseCur)}</div>
-      <div class="target">${target ? 'of '+fmtMoney(target, baseCur)+(over?' · over budget':'') : 'no target set'}</div>
-    </div>
-    ${target ? `<div class="meter"><span class="${over?'over':''}" style="width:${over?100:pct}%"></span></div>` : ''}
-  </div>`;
-
-  const byCat = {};
-  expenses.forEach(e=>{ byCat[e.category] = (byCat[e.category]||0) + Number(e.amount||0); });
-  const max = Math.max(1, ...Object.values(byCat));
-  const cat = document.getElementById('budgetByCat');
-  const rows = CATEGORIES.filter(c=>byCat[c]).map(c=>`
-    <div class="catrow">
-      <span class="cname">${c}</span>
-      <span class="cbar"><span style="width:${byCat[c]/max*100}%"></span></span>
-      <span class="camt">${fmtMoney(byCat[c], baseCur)}</span>
+function _renderExpenseRows(drawerExpenses, drawer, countryId) {
+  return drawerExpenses.map(e => `
+    <div class="expense-row" onclick="editExpense('${e.id}')">
+      <span class="expense-row-label">${esc(e.label || 'Expense')}</span>
+      <span class="expense-row-amount">${fmt(e.amount)}</span>
+      <button class="expense-row-del" onclick="event.stopPropagation();delExpense('${e.id}')" title="Delete">×</button>
     </div>`).join('');
-  cat.innerHTML = rows ? `<div class="catwrap">${rows}</div>` : '';
+}
 
-  const el = document.getElementById('expenseList');
-  if(!expenses.length){ el.innerHTML = '<div class="empty">No expenses yet. Add one to start tracking.</div>'; return; }
-  el.innerHTML = expenses.map(e=>{
-    const country = countries.find(c=>c.id===e.country_id);
-    return `<div class="card">
-      <button class="del" onclick="delExpense('${e.id}')">×</button>
-      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px">
-        <span style="font-family:'Fraunces',serif;font-size:18px;font-weight:600">${esc(e.label)}</span>
-        <span style="font-family:'Fraunces',serif;font-size:18px">${fmtMoney(e.amount, e.currency)}</span>
-      </div>
-      <div class="flight-meta" style="margin-top:8px">
-        <span class="exp-cat">${esc(e.category)}</span>
-        ${country?`<span>${esc(country.flag||'')} ${esc(country.name)}</span>`:''}
-        ${e.spent_on?`<span>${esc(e.spent_on)}</span>`:''}
-      </div>
-      ${e.notes?`<div class="flight-meta" style="margin-top:6px">${esc(e.notes)}</div>`:''}
+function _renderAddRow(drawer, countryId) {
+  return `<div class="add-expense-row" onclick="openExpense('${drawer}','${countryId || ''}')">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Add expense
+  </div>`;
+}
+
+function _renderMeter(actual, planned) {
+  if (!planned) return '';
+  const pct = Math.min(100, Math.round(actual / planned * 100));
+  const over = actual > planned;
+  return `<div class="budget-meter"><div class="budget-meter-fill${over ? ' over' : ''}" style="width:${pct}%"></div></div>`;
+}
+
+function _renderOneoffDrawer() {
+  const el = document.getElementById('drawer-oneoff');
+  if (!el) return;
+  const manualExpenses = expenses.filter(e => e.drawer === 'oneoff');
+  const bookedFlights = flights.filter(f => f.booked);
+  const autoTotal = bookedFlightSum();
+  const manualTotal = manualExpenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+  const actual = autoTotal + manualTotal;
+  const planned = budgetPlanned.oneoff;
+  const over = planned && actual > planned;
+
+  const autoRows = bookedFlights.map(f => {
+    const parsed = parsePrice(f.price);
+    const label = [f.airline, f.origin && f.destination ? f.origin + ' → ' + f.destination : ''].filter(Boolean).join(' · ') || 'Flight';
+    return `<div class="expense-row auto">
+      <span class="expense-row-label">${esc(label)}</span>
+      <span class="expense-row-amount">${parsed != null ? fmt(parsed) : esc(f.price || '—')}</span>
     </div>`;
   }).join('');
+
+  el.innerHTML = `
+    <div class="drawer-header">
+      <span class="drawer-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2H7a2 2 0 0 0-1.41.59L2.59 6.59A2 2 0 0 0 2 8v5a2 2 0 0 0 .59 1.41l7 7a2 2 0 0 0 2.82 0l7-7a2 2 0 0 0 0-2.82l-7-7A2 2 0 0 0 12 2z"/>
+          <circle cx="7.5" cy="7.5" r="1.5" fill="currentColor" stroke="none"/>
+        </svg>
+      </span>
+      <span class="drawer-title">One-off Expenses</span>
+      <div class="drawer-totals">
+        <div class="actual${over ? ' over' : ''}">${fmt(actual)}</div>
+        <div class="drawer-planned">${_renderPlannedEdit('oneoff', planned, '')}</div>
+      </div>
+    </div>
+    ${_renderMeter(actual, planned)}
+    ${autoRows}
+    ${_renderExpenseRows(manualExpenses, 'oneoff', '')}
+    ${_renderAddRow('oneoff', '')}`;
+}
+
+function _renderDailyDrawer() {
+  const el = document.getElementById('drawer-daily');
+  if (!el) return;
+  const dailyExpenses = expenses.filter(e => e.drawer === 'daily');
+  const totalActual = dailyExpenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+  const totalPlanned = countries.reduce((s, c) =>
+    s + Number(c.daily_budget || 0) * Number(c.planned_days || 0), 0);
+  const over = totalPlanned > 0 && totalActual > totalPlanned;
+
+  const countrySections = countries.map(c => {
+    const cExpenses = dailyExpenses.filter(e => e.country_id === c.id);
+    const cActual = cExpenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+    const cPlanned = Number(c.daily_budget || 0) * Number(c.planned_days || 0);
+    const cOver = cPlanned > 0 && cActual > cPlanned;
+    const defaultCollapsed = cExpenses.length === 0;
+    const isCollapsed = _collapsedCountries.has(c.id) ? !defaultCollapsed : defaultCollapsed;
+    const arrow = isCollapsed ? '▸' : '▾';
+
+    const plannedLabel = cPlanned ? fmt(cPlanned) : '';
+
+    return `<div class="daily-country">
+      <div class="daily-country-header" onclick="toggleCountrySection('${c.id}')">
+        <span class="daily-arrow">${arrow}</span>
+        <span class="daily-country-name">${esc(c.flag || '')} ${esc(c.name)}</span>
+        <span class="daily-country-meta">${_renderPlannedEdit('daily', c.daily_budget, c.id)}${plannedLabel ? ' = ' + plannedLabel : ''}</span>
+        <span class="daily-country-actual${cOver ? ' over' : ''}">${cActual ? fmt(cActual) : ''}</span>
+      </div>
+      ${isCollapsed ? '' : `
+        ${_renderExpenseRows(cExpenses, 'daily', c.id)}
+        ${_renderAddRow('daily', c.id)}
+      `}
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="drawer-header">
+      <span class="drawer-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="4"/>
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+        </svg>
+      </span>
+      <span class="drawer-title">Daily Budget</span>
+      <div class="drawer-totals">
+        <div class="actual${over ? ' over' : ''}">${fmt(totalActual)}</div>
+        ${totalPlanned ? `<div class="drawer-planned">of ${fmt(totalPlanned)}</div>` : ''}
+      </div>
+    </div>
+    ${_renderMeter(totalActual, totalPlanned)}
+    ${countrySections || '<div style="padding:14px 18px;color:var(--ink-soft);font-size:14px">No countries yet — add them in the Countries tab.</div>'}`;
+}
+
+function _renderContingencyDrawer() {
+  const el = document.getElementById('drawer-contingency');
+  if (!el) return;
+  const cExpenses = expenses.filter(e => e.drawer === 'contingency');
+  const actual = cExpenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+  const planned = budgetPlanned.contingency;
+  const over = planned && actual > planned;
+
+  el.innerHTML = `
+    <div class="drawer-header">
+      <span class="drawer-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M23 12a11.05 11.05 0 0 0-22 0zm-5 7a3 3 0 0 1-6 0v-7"/>
+        </svg>
+      </span>
+      <span class="drawer-title">Contingency Budget</span>
+      <div class="drawer-totals">
+        <div class="actual${over ? ' over' : ''}">${fmt(actual)}</div>
+        <div class="drawer-planned">${_renderPlannedEdit('contingency', planned, '')}</div>
+      </div>
+    </div>
+    ${_renderMeter(actual, planned)}
+    ${_renderExpenseRows(cExpenses, 'contingency', '')}
+    ${_renderAddRow('contingency', '')}`;
+}
+
+function toggleCountrySection(countryId) {
+  if (_collapsedCountries.has(countryId)) _collapsedCountries.delete(countryId); else _collapsedCountries.add(countryId);
+  renderBudget();
 }
 
 function openExpense(){
   ['label','amount','currency','notes'].forEach(k=>document.getElementById('e-'+k).value='');
-  document.getElementById('e-currency').value = budgetTarget?.base_currency || 'USD';
+  document.getElementById('e-currency').value = 'USD';
   document.getElementById('e-category').value = 'Other';
   document.getElementById('e-date').value = new Date().toISOString().slice(0,10);
   const sel = document.getElementById('e-country');
@@ -1570,8 +1695,8 @@ async function delExpense(id){
 }
 
 function openBudgetTarget(){
-  document.getElementById('t-total').value = budgetTarget?.total_budget || '';
-  document.getElementById('t-currency').value = budgetTarget?.base_currency || 'USD';
+  document.getElementById('t-total').value = '';
+  document.getElementById('t-currency').value = 'USD';
   openOverlay('ov-target');
 }
 async function saveBudgetTarget(){
