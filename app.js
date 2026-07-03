@@ -1562,11 +1562,15 @@ function _renderOneoffDrawer() {
       <span class="drawer-title">One-off Expenses</span>
       <div class="drawer-totals">
         <div class="actual${over ? ' over' : ''}">${fmt(actual)}</div>
-        <div class="drawer-planned" onclick="event.stopPropagation()">${_renderPlannedEdit('oneoff', planned, '')}</div>
+        ${planned ? `<div class="drawer-planned">of ${fmt(planned)}</div>` : ''}
       </div>
       <span class="drawer-chevron">${collapsed ? '▸' : '▾'}</span>
     </div>
     ${collapsed ? '' : `
+      <div class="drawer-budget-row" onclick="event.stopPropagation()">
+        <span class="daily-rate-label">Budget</span>
+        <span class="daily-rate-edit" onclick="startEditPlanned('oneoff','',this)">${planned != null ? fmt(planned) : 'set budget'}</span>
+      </div>
       ${_renderMeter(actual, planned)}
       ${autoRows}
       ${_renderExpenseRows(manualExpenses, 'oneoff', '')}
@@ -1654,11 +1658,15 @@ function _renderContingencyDrawer() {
       <span class="drawer-title">Contingency Budget</span>
       <div class="drawer-totals">
         <div class="actual${over ? ' over' : ''}">${fmt(actual)}</div>
-        <div class="drawer-planned" onclick="event.stopPropagation()">${_renderPlannedEdit('contingency', planned, '')}</div>
+        ${planned ? `<div class="drawer-planned">of ${fmt(planned)}</div>` : ''}
       </div>
       <span class="drawer-chevron">${collapsed ? '▸' : '▾'}</span>
     </div>
     ${collapsed ? '' : `
+      <div class="drawer-budget-row" onclick="event.stopPropagation()">
+        <span class="daily-rate-label">Budget</span>
+        <span class="daily-rate-edit" onclick="startEditPlanned('contingency','',this)">${planned != null ? fmt(planned) : 'set budget'}</span>
+      </div>
       ${_renderMeter(actual, planned)}
       ${_renderExpenseRows(cExpenses, 'contingency', '')}
       ${_renderAddRow('contingency', '')}
