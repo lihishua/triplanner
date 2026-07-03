@@ -304,14 +304,20 @@
   /* TRIP CAROUSEL */
   .trip-carousel{display:flex;gap:8px;padding:14px 0 2px;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
   .trip-carousel::-webkit-scrollbar{display:none}
-  .trip-chip-x{margin-left:5px;font-size:13px;opacity:.7;line-height:1;vertical-align:middle}
-  .trip-chip-x:hover{opacity:1;color:var(--red,#c0392b)}
   .trip-chip{flex-shrink:0;font-family:'Fraunces',serif;font-size:14px;padding:7px 18px;
     border-radius:20px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);
-    cursor:pointer;white-space:nowrap;transition:all .15s;display:inline-flex;align-items:center;overflow:visible}
+    cursor:pointer;white-space:nowrap;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
   .trip-chip:hover{border-color:var(--accent);color:var(--accent)}
   .trip-chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
   .trip-chip.add{border-style:dashed}
+  .trip-chip-chevron{font-size:10px;opacity:.8}
+  .trip-menu{background:var(--paper);border:1px solid var(--line);border-radius:14px;
+    padding:5px;box-shadow:0 4px 16px rgba(0,0,0,.12);margin-top:4px}
+  .trip-menu button{display:flex;align-items:center;gap:9px;width:100%;text-align:left;
+    padding:11px 14px;background:none;border:none;font-size:14px;cursor:pointer;
+    border-radius:9px;color:var(--ink);transition:background .12s}
+  .trip-menu button:hover{background:var(--accent-soft)}
+  .trip-menu-delete{color:var(--red) !important}
 
   /* Smart input modal */
   #si-image-preview{display:flex;align-items:center;gap:8px;margin-top:8px}
@@ -466,9 +472,14 @@
       <div class="brand-sub">plan your trip. together.</div>
     </header>
     <div id="trip-carousel" class="trip-carousel" style="display:none"></div>
-    <div style="margin:6px 0 2px">
-      <button id="share-btn" onclick="shareTrip()" class="btn ghost small" title="Invite to trip" style="color:var(--ink-soft)">
+    <div id="trip-menu" class="trip-menu" style="display:none">
+      <button onclick="shareTrip();closeTripMenu()">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+        Share
+      </button>
+      <button class="trip-menu-delete" onclick="doLeaveTrip();closeTripMenu()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        Delete
       </button>
     </div>
     <div class="top-actions">

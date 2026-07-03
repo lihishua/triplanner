@@ -213,10 +213,23 @@ function renderTripCarousel() {
     return;
   }
   el.innerHTML = myTrips.map(t =>
-    `<button class="trip-chip${t.id === TRIP_ID ? ' active' : ''}" onclick="switchTrip('${t.id}')">
-      ${esc(t.name)}<span class="trip-chip-x" onclick="event.stopPropagation();doLeaveTripById('${t.id}')">×</span>
-    </button>`
+    t.id === TRIP_ID
+      ? `<button class="trip-chip active" onclick="toggleTripMenu(event)">${esc(t.name)}<span class="trip-chip-chevron">▾</span></button>`
+      : `<button class="trip-chip" onclick="switchTrip('${t.id}')">${esc(t.name)}</button>`
   ).join('') + `<button class="trip-chip add" onclick="openTripsManager()">＋ New trip</button>`;
+}
+
+function toggleTripMenu(e) {
+  e.stopPropagation();
+  const menu = document.getElementById('trip-menu');
+  const open = menu.style.display === 'none' || !menu.style.display;
+  menu.style.display = open ? '' : 'none';
+  if (open) setTimeout(() => document.addEventListener('click', closeTripMenu, { once: true }), 0);
+}
+
+function closeTripMenu() {
+  const menu = document.getElementById('trip-menu');
+  if (menu) menu.style.display = 'none';
 }
 
 async function switchTrip(id) {
@@ -1886,6 +1899,11 @@ function showTab(t){
   document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id==='page-'+t));
 }
 function openOverlay(id){ document.getElementById(id).classList.add('show'); }
+
+// Close overlay when tapping the backdrop (outside the modal)
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('overlay') && e.target.classList.contains('show')) closeAll();
+});
 function openCapture(){
   document.getElementById('cap-place').value='';
   document.getElementById('cap-city').value='';
