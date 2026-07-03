@@ -1236,7 +1236,7 @@ function renderFlights() {
   const el = document.getElementById('flightList');
   const eligible = flights.filter(f => f.origin && f.destination);
   if (!eligible.length) {
-    el.innerHTML = '<div class="add-flight-card" onclick="openFlight()">＋</div>';
+    el.innerHTML = '';
     return;
   }
   const legs = groupFlightsByLeg(eligible);
@@ -1259,7 +1259,7 @@ function renderFlights() {
         ${leg.flights.map(f => renderFlightCard(f)).join('')}
       </div>
     </div>
-  `).join('') + '<div class="add-flight-card" onclick="openFlight()">＋</div>';
+  `).join('');
 }
 
 function moveLeg(key, dir) {
