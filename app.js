@@ -646,7 +646,7 @@ async function runCapture() {
 /* ---------------- RENDER: COUNTRIES ---------------- */
 function renderCountries() {
   const el = document.getElementById('countryList');
-  const addCard = '<div class="add-flight-card" onclick="openSmartInput()">＋</div>';
+  const addCard = '<div class="add-flight-card" onclick="openCapture()">＋</div>';
   if (!countries.length) {
     el.innerHTML = addCard;
   } else {
@@ -1233,18 +1233,32 @@ function renderFlights() {
                   ...currentKeys.filter(k => !legOrder.includes(k))];
   if (merged.join() !== legOrder.join()) saveLegOrder(merged);
 
-  el.innerHTML = legs.map(leg => `
+  el.innerHTML = legs.map((leg, i) => `
     <div class="leg-group" data-key="${esc(leg.key)}">
       <div class="leg-header">
         <span class="leg-label">${esc(leg.originLabel)} → ${esc(leg.destLabel)}</span>
-        <span class="drag-handle" draggable="true" data-key="${esc(leg.key)}" title="Drag to reorder">⠿</span>
+        <span class="leg-reorder">
+          ${i > 0 ? `<button class="leg-move-btn" onclick="moveLeg('${esc(leg.key)}',-1)" title="Move up">↑</button>` : ''}
+          ${i < legs.length - 1 ? `<button class="leg-move-btn" onclick="moveLeg('${esc(leg.key)}',1)" title="Move down">↓</button>` : ''}
+        </span>
       </div>
       <div class="leg-flights">
         ${leg.flights.map(f => renderFlightCard(f)).join('')}
       </div>
     </div>
   `).join('') + '<div class="add-flight-card" onclick="openFlight()">＋</div>';
-  initLegDrag();
+}
+
+function moveLeg(key, dir) {
+  const el = document.getElementById('flightList');
+  const allKeys = [...el.querySelectorAll('.leg-group')].map(g => g.dataset.key);
+  const idx = allKeys.indexOf(key);
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= allKeys.length) return;
+  allKeys.splice(idx, 1);
+  allKeys.splice(newIdx, 0, key);
+  saveLegOrder(allKeys);
+  renderFlights();
 }
 
 function renderFlightCard(f) {
@@ -1274,62 +1288,6 @@ function renderFlightCard(f) {
       </div>
       <button class="del" onclick="event.stopPropagation();delFlight('${f.id}')">×</button>
     </div>`;
-}
-
-let _dragKey     = null;
-let _legDragInit = false;
-
-function initLegDrag() {
-  if (_legDragInit) return;
-  _legDragInit = true;
-  const el = document.getElementById('flightList');
-
-  el.addEventListener('dragstart', e => {
-    const handle = e.target.closest('.drag-handle[data-key]');
-    if (!handle) { e.preventDefault(); return; }
-    _dragKey = handle.dataset.key;
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', _dragKey);
-    handle.closest('.leg-group')?.classList.add('dragging');
-  });
-
-  el.addEventListener('dragover', e => {
-    if (!_dragKey) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    const group = e.target.closest('.leg-group');
-    el.querySelectorAll('.leg-group').forEach(g => g.classList.remove('drag-over'));
-    if (group && group.dataset.key !== _dragKey) group.classList.add('drag-over');
-  });
-
-  el.addEventListener('dragleave', e => {
-    if (!e.relatedTarget || !el.contains(e.relatedTarget)) {
-      el.querySelectorAll('.leg-group').forEach(g => g.classList.remove('drag-over'));
-    }
-  });
-
-  el.addEventListener('drop', async e => {
-    e.preventDefault();
-    const targetGroup = e.target.closest('.leg-group');
-    if (!targetGroup || !_dragKey || targetGroup.dataset.key === _dragKey) {
-      cleanupLegDrag(el); return;
-    }
-    const allKeys = [...el.querySelectorAll('.leg-group')].map(g => g.dataset.key);
-    const fromIdx = allKeys.indexOf(_dragKey);
-    const toIdx   = allKeys.indexOf(targetGroup.dataset.key);
-    allKeys.splice(fromIdx, 1);
-    allKeys.splice(toIdx, 0, _dragKey);
-    cleanupLegDrag(el);
-    saveLegOrder(allKeys);
-    renderFlights();
-  });
-
-  el.addEventListener('dragend', () => cleanupLegDrag(el));
-}
-
-function cleanupLegDrag(el) {
-  _dragKey = null;
-  el.querySelectorAll('.leg-group').forEach(g => g.classList.remove('dragging', 'drag-over'));
 }
 
 function openFlight() {
@@ -1509,10 +1467,14 @@ function _renderBudgetSummaryBar() {
   const over = hasPlan && totalActual > totalPlanned;
   el.innerHTML = `<div class="budget-summary-bar">
     <div class="bsb-row">
-      <span class="bsb-label">Total spent</span>
-      <span class="bsb-amounts">${fmt(totalActual)}${hasPlan ? ' of ' + fmt(totalPlanned) : ''}</span>
+      <span class="bsb-label">Spent</span>
+      <span class="bsb-amounts${over ? ' over' : ''}">${fmt(totalActual)}</span>
     </div>
-    ${hasPlan ? `<div class="bsb-meter"><div class="bsb-fill${over ? ' over' : ''}" style="width:${pct}%"></div></div>` : ''}
+    <div class="bsb-row" style="margin-top:2px">
+      <span class="bsb-label">Planned</span>
+      <span class="bsb-amounts">${hasPlan ? fmt(totalPlanned) : '—'}</span>
+    </div>
+    <div class="bsb-meter" style="margin-top:10px"><div class="bsb-fill${over ? ' over' : ''}" style="width:${pct}%"></div></div>
   </div>`;
 }
 

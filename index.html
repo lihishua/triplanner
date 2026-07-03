@@ -329,10 +329,9 @@
   .leg-group{margin-bottom:24px}
   .leg-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
   .leg-label{font-family:'Fraunces',serif;font-size:17px;font-weight:600;color:var(--ink)}
-  .drag-handle{font-size:20px;color:var(--ink-soft);cursor:grab;padding:4px 8px;line-height:1;user-select:none;touch-action:none}
-  .drag-handle:active{cursor:grabbing}
-  .leg-group.dragging{opacity:.45}
-  .leg-group.drag-over .leg-header{outline:2px dashed var(--accent);border-radius:6px}
+  .leg-reorder{display:flex;gap:2px;flex-shrink:0}
+  .leg-move-btn{background:none;border:none;cursor:pointer;font-size:16px;color:var(--ink-soft);padding:2px 6px;border-radius:6px;line-height:1}
+  .leg-move-btn:hover{background:var(--accent-soft);color:var(--accent)}
   .flight-card{display:flex;align-items:flex-start;gap:12px;padding:14px 16px}
   .add-flight-card{border:1.5px dashed var(--line);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;min-height:60px;font-size:22px;color:var(--ink-soft);cursor:pointer;transition:border-color .15s,color .15s}
   .add-flight-card:hover{border-color:var(--accent);color:var(--accent)}
@@ -381,6 +380,7 @@
   .bsb-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
   .bsb-label{font-size:13px;color:var(--ink-soft)}
   .bsb-amounts{font-family:'Fraunces',serif;font-size:15px;color:var(--ink)}
+  .bsb-amounts.over{color:var(--red)}
   .bsb-meter{height:6px;background:var(--line);border-radius:3px;overflow:hidden}
   .bsb-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .3s}
   .bsb-fill.over{background:var(--red)}
