@@ -1420,6 +1420,13 @@ function cancelBookFlight() {
 
 /* ---------------- BUDGET ---------------- */
 const _collapsedCountries = new Set();
+const _collapsedDrawers   = new Set();
+
+function toggleDrawer(name) {
+  if (_collapsedDrawers.has(name)) _collapsedDrawers.delete(name);
+  else _collapsedDrawers.add(name);
+  renderBudget();
+}
 
 function fmt(n) {
   return '$' + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
@@ -1460,7 +1467,7 @@ function _renderBudgetSummaryBar() {
   const contActual = expenses.filter(e => e.drawer === 'contingency').reduce((s, e) => s + Number(e.amount || 0), 0);
   const totalActual = oneoffActual + dailyActual + contActual;
   const dailyPlanned = countries.reduce((s, c) =>
-    s + Number(c.daily_budget || 0) * Number(c.planned_days || 0), 0);
+    s + Number(c.daily_budget || 0) * Number(c.planned_days || 30), 0);
   const totalPlanned = Number(budgetPlanned.oneoff || 0) + dailyPlanned + Number(budgetPlanned.contingency || 0);
   const hasPlan = totalPlanned > 0;
   const pct = hasPlan ? Math.min(100, Math.round(totalActual / totalPlanned * 100)) : 0;
@@ -1530,9 +1537,10 @@ function _renderOneoffDrawer() {
     </div>`;
   }).join('');
 
+  const collapsed = _collapsedDrawers.has('oneoff');
   el.innerHTML = `
-    <div class="drawer-header">
-      <span class="drawer-icon">
+    <div class="drawer-header" onclick="toggleDrawer('oneoff')" style="cursor:pointer">
+      <span class="drawer-icon drawer-icon-oneoff">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 2H7a2 2 0 0 0-1.41.59L2.59 6.59A2 2 0 0 0 2 8v5a2 2 0 0 0 .59 1.41l7 7a2 2 0 0 0 2.82 0l7-7a2 2 0 0 0 0-2.82l-7-7A2 2 0 0 0 12 2z"/>
           <circle cx="7.5" cy="7.5" r="1.5" fill="currentColor" stroke="none"/>
@@ -1541,13 +1549,16 @@ function _renderOneoffDrawer() {
       <span class="drawer-title">One-off Expenses</span>
       <div class="drawer-totals">
         <div class="actual${over ? ' over' : ''}">${fmt(actual)}</div>
-        <div class="drawer-planned">${_renderPlannedEdit('oneoff', planned, '')}</div>
+        <div class="drawer-planned" onclick="event.stopPropagation()">${_renderPlannedEdit('oneoff', planned, '')}</div>
       </div>
+      <span class="drawer-chevron">${collapsed ? '▸' : '▾'}</span>
     </div>
-    ${_renderMeter(actual, planned)}
-    ${autoRows}
-    ${_renderExpenseRows(manualExpenses, 'oneoff', '')}
-    ${_renderAddRow('oneoff', '')}`;
+    ${collapsed ? '' : `
+      ${_renderMeter(actual, planned)}
+      ${autoRows}
+      ${_renderExpenseRows(manualExpenses, 'oneoff', '')}
+      ${_renderAddRow('oneoff', '')}
+    `}`;
 }
 
 function _renderDailyDrawer() {
@@ -1556,37 +1567,43 @@ function _renderDailyDrawer() {
   const dailyExpenses = expenses.filter(e => e.drawer === 'daily');
   const totalActual = dailyExpenses.reduce((s, e) => s + Number(e.amount || 0), 0);
   const totalPlanned = countries.reduce((s, c) =>
-    s + Number(c.daily_budget || 0) * Number(c.planned_days || 0), 0);
+    s + Number(c.daily_budget || 0) * Number(c.planned_days || 30), 0);
   const over = totalPlanned > 0 && totalActual > totalPlanned;
 
   const countrySections = countries.map(c => {
     const cExpenses = dailyExpenses.filter(e => e.country_id === c.id);
     const cActual = cExpenses.reduce((s, e) => s + Number(e.amount || 0), 0);
-    const cPlanned = Number(c.daily_budget || 0) * Number(c.planned_days || 0);
+    const effectiveDays = Number(c.planned_days || 30);
+    const cPlanned = Number(c.daily_budget || 0) * effectiveDays;
     const cOver = cPlanned > 0 && cActual > cPlanned;
-    const defaultCollapsed = cExpenses.length === 0;
+    const defaultCollapsed = cExpenses.length === 0 && c.daily_budget == null;
     const isCollapsed = _collapsedCountries.has(c.id) ? !defaultCollapsed : defaultCollapsed;
     const arrow = isCollapsed ? '▸' : '▾';
-
-    const plannedLabel = cPlanned ? fmt(cPlanned) : '';
+    const daysNote = c.planned_days ? `${c.planned_days} days` : '30 days';
 
     return `<div class="daily-country">
       <div class="daily-country-header" onclick="toggleCountrySection('${c.id}')">
         <span class="daily-arrow">${arrow}</span>
         <span class="daily-country-name">${esc(c.flag || '')} ${esc(c.name)}</span>
-        <span class="daily-country-meta">${_renderPlannedEdit('daily', c.daily_budget, c.id)}${plannedLabel ? ' = ' + plannedLabel : ''}</span>
-        <span class="daily-country-actual${cOver ? ' over' : ''}">${cActual ? fmt(cActual) : ''}</span>
+        <span class="daily-country-meta">${cPlanned ? fmt(cPlanned) + ' planned' : ''}</span>
+        <span class="daily-country-actual${cOver ? ' over' : ''}">${cActual ? fmt(cActual) + ' spent' : ''}</span>
       </div>
       ${isCollapsed ? '' : `
+        <div class="daily-rate-row" onclick="event.stopPropagation()">
+          <span class="daily-rate-label">Daily budget</span>
+          <span class="daily-rate-edit" onclick="startEditPlanned('daily','${c.id}',this)">${c.daily_budget != null ? fmt(c.daily_budget) + '/day' : 'set rate'}</span>
+          <span class="daily-rate-calc">× ${daysNote} = ${cPlanned ? fmt(cPlanned) : '—'}</span>
+        </div>
         ${_renderExpenseRows(cExpenses, 'daily', c.id)}
         ${_renderAddRow('daily', c.id)}
       `}
     </div>`;
   }).join('');
 
+  const collapsed = _collapsedDrawers.has('daily');
   el.innerHTML = `
-    <div class="drawer-header">
-      <span class="drawer-icon">
+    <div class="drawer-header" onclick="toggleDrawer('daily')" style="cursor:pointer">
+      <span class="drawer-icon drawer-icon-daily">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="4"/>
           <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
@@ -1597,9 +1614,12 @@ function _renderDailyDrawer() {
         <div class="actual${over ? ' over' : ''}">${fmt(totalActual)}</div>
         ${totalPlanned ? `<div class="drawer-planned">of ${fmt(totalPlanned)}</div>` : ''}
       </div>
+      <span class="drawer-chevron">${collapsed ? '▸' : '▾'}</span>
     </div>
-    ${_renderMeter(totalActual, totalPlanned)}
-    ${countrySections || '<div style="padding:14px 18px;color:var(--ink-soft);font-size:14px">No countries yet — add them in the Countries tab.</div>'}`;
+    ${collapsed ? '' : `
+      ${_renderMeter(totalActual, totalPlanned)}
+      ${countrySections || '<div style="padding:14px 18px;color:var(--ink-soft);font-size:14px">No countries yet — add them in the Countries tab.</div>'}
+    `}`;
 }
 
 function _renderContingencyDrawer() {
@@ -1610,9 +1630,10 @@ function _renderContingencyDrawer() {
   const planned = budgetPlanned.contingency;
   const over = planned && actual > planned;
 
+  const collapsed = _collapsedDrawers.has('contingency');
   el.innerHTML = `
-    <div class="drawer-header">
-      <span class="drawer-icon">
+    <div class="drawer-header" onclick="toggleDrawer('contingency')" style="cursor:pointer">
+      <span class="drawer-icon drawer-icon-contingency">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M23 12a11.05 11.05 0 0 0-22 0zm-5 7a3 3 0 0 1-6 0v-7"/>
         </svg>
@@ -1620,12 +1641,15 @@ function _renderContingencyDrawer() {
       <span class="drawer-title">Contingency Budget</span>
       <div class="drawer-totals">
         <div class="actual${over ? ' over' : ''}">${fmt(actual)}</div>
-        <div class="drawer-planned">${_renderPlannedEdit('contingency', planned, '')}</div>
+        <div class="drawer-planned" onclick="event.stopPropagation()">${_renderPlannedEdit('contingency', planned, '')}</div>
       </div>
+      <span class="drawer-chevron">${collapsed ? '▸' : '▾'}</span>
     </div>
-    ${_renderMeter(actual, planned)}
-    ${_renderExpenseRows(cExpenses, 'contingency', '')}
-    ${_renderAddRow('contingency', '')}`;
+    ${collapsed ? '' : `
+      ${_renderMeter(actual, planned)}
+      ${_renderExpenseRows(cExpenses, 'contingency', '')}
+      ${_renderAddRow('contingency', '')}
+    `}`;
 }
 
 function toggleCountrySection(countryId) {
