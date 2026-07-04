@@ -1912,6 +1912,29 @@ function openOverlay(id){ document.getElementById(id).classList.add('show'); }
 document.addEventListener('click', e => {
   if (e.target.classList.contains('overlay') && e.target.classList.contains('show')) closeAll();
 });
+
+// Swipe left/right to switch tabs
+(function() {
+  const TABS = ['countries', 'flights', 'budget', 'prep'];
+  let _sx = 0, _sy = 0;
+  function activeIdx() {
+    const b = document.querySelector('nav.tabs button.active');
+    return b ? TABS.indexOf(b.dataset.tab) : 0;
+  }
+  document.addEventListener('touchstart', e => {
+    _sx = e.touches[0].clientX;
+    _sy = e.touches[0].clientY;
+  }, { passive: true });
+  document.addEventListener('touchend', e => {
+    if (document.querySelector('.overlay.show')) return;
+    const dx = e.changedTouches[0].clientX - _sx;
+    const dy = e.changedTouches[0].clientY - _sy;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    const i = activeIdx();
+    if (dx < 0 && i < TABS.length - 1) showTab(TABS[i + 1]);
+    else if (dx > 0 && i > 0) showTab(TABS[i - 1]);
+  }, { passive: true });
+})();
 function openCapture(){
   document.getElementById('cap-place').value='';
   document.getElementById('cap-city').value='';
