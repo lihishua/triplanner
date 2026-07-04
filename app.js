@@ -222,9 +222,9 @@ function renderTripCarousel() {
 function toggleTripMenu(e) {
   e.stopPropagation();
   const menu = document.getElementById('trip-menu');
-  const open = menu.style.display === 'none' || !menu.style.display;
-  menu.style.display = open ? '' : 'none';
-  if (open) setTimeout(() => document.addEventListener('click', closeTripMenu, { once: true }), 0);
+  const wasOpen = menu.style.display !== 'none';
+  menu.style.display = wasOpen ? 'none' : '';
+  if (!wasOpen) setTimeout(() => document.addEventListener('click', closeTripMenu, { once: true }), 0);
 }
 
 function closeTripMenu() {
