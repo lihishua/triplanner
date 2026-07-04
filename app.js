@@ -1433,7 +1433,11 @@ function cancelBookFlight() {
 
 /* ---------------- BUDGET ---------------- */
 const _collapsedCountries = new Set();
-const _collapsedDrawers   = new Set();
+const _collapsedDrawers   = new Set(['oneoff', 'daily', 'contingency']);
+
+let budgetCurrency = localStorage.getItem('triplanner_budget_currency') || 'USD';
+let _fxRate = 1;
+const _CURRENCY_SYMS = { USD: '$', ILS: '₪', EUR: '€', GBP: '£' };
 
 function toggleDrawer(name) {
   if (_collapsedDrawers.has(name)) _collapsedDrawers.delete(name);
@@ -1442,7 +1446,75 @@ function toggleDrawer(name) {
 }
 
 function fmt(n) {
-  return '$' + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
+  const sym = _CURRENCY_SYMS[budgetCurrency] || '$';
+  return sym + Number((n || 0) * _fxRate).toLocaleString(undefined, { maximumFractionDigits: 0 });
+}
+
+function toggleCurrencyPicker(e) {
+  e.stopPropagation();
+  const picker = document.getElementById('currency-picker');
+  const wasOpen = picker.style.display !== 'none';
+  picker.style.display = wasOpen ? 'none' : '';
+  if (!wasOpen) setTimeout(() => document.addEventListener('click', () => { picker.style.display = 'none'; }, { once: true }), 0);
+}
+
+async function selectCurrency(code) {
+  budgetCurrency = code;
+  localStorage.setItem('triplanner_budget_currency', code);
+  document.getElementById('currency-picker').style.display = 'none';
+  if (code === 'USD') {
+    _fxRate = 1;
+    _updateCurrencyUI();
+    renderBudget();
+    return;
+  }
+  const cached = JSON.parse(localStorage.getItem('triplanner_fx_' + code) || 'null');
+  if (cached && Date.now() - cached.ts < 3600000) {
+    _fxRate = cached.rate;
+    _updateCurrencyUI();
+    renderBudget();
+    return;
+  }
+  await _fetchFxRate();
+}
+
+async function refreshFxRate() {
+  if (budgetCurrency === 'USD') return;
+  await _fetchFxRate();
+}
+
+async function _fetchFxRate() {
+  try {
+    const res = await fetch('https://open.er-api.com/v6/latest/USD');
+    const data = await res.json();
+    _fxRate = data.rates?.[budgetCurrency] ?? 1;
+    localStorage.setItem('triplanner_fx_' + budgetCurrency, JSON.stringify({ rate: _fxRate, ts: Date.now() }));
+  } catch(err) {
+    console.warn('FX fetch failed', err);
+  }
+  _updateCurrencyUI();
+  renderBudget();
+}
+
+function _updateCurrencyUI() {
+  const btn = document.getElementById('currency-btn');
+  const refreshBtn = document.getElementById('fx-refresh-btn');
+  if (btn) {
+    const sym = _CURRENCY_SYMS[budgetCurrency] || '';
+    btn.textContent = sym + ' ' + budgetCurrency;
+  }
+  if (refreshBtn) refreshBtn.style.display = budgetCurrency === 'USD' ? 'none' : '';
+  document.querySelectorAll('.currency-option').forEach(b => {
+    b.classList.toggle('active', b.dataset.code === budgetCurrency);
+  });
+}
+
+function _initFxRate() {
+  if (budgetCurrency === 'USD') { _updateCurrencyUI(); return; }
+  if (_fxRate !== 1) { _updateCurrencyUI(); return; }
+  const cached = JSON.parse(localStorage.getItem('triplanner_fx_' + budgetCurrency) || 'null');
+  if (cached) { _fxRate = cached.rate; _updateCurrencyUI(); }
+  else _fetchFxRate();
 }
 
 function fmtMoney(n, cur){
@@ -1465,6 +1537,7 @@ function bookedFlightSum() {
 }
 
 function renderBudget() {
+  _initFxRate();
   _renderBudgetSummaryBar();
   _renderOneoffDrawer();
   _renderDailyDrawer();
@@ -1541,12 +1614,13 @@ function _renderOneoffDrawer() {
   const planned = budgetPlanned.oneoff;
   const over = planned && actual > planned;
 
-  const autoRows = bookedFlights.map(f => {
-    const parsed = parsePrice(f.price);
-    const label = [f.airline, f.origin && f.destination ? f.origin + ' → ' + f.destination : ''].filter(Boolean).join(' · ') || 'Flight';
+  const bookedLegs = groupFlightsByLeg(bookedFlights);
+  const autoRows = bookedLegs.map(leg => {
+    const legTotal = leg.flights.reduce((s, f) => s + (parsePrice(f.price) ?? 0), 0);
+    const hasPrice = leg.flights.some(f => parsePrice(f.price) != null);
     return `<div class="expense-row auto">
-      <span class="expense-row-label">${esc(label)}</span>
-      <span class="expense-row-amount">${parsed != null ? fmt(parsed) : esc(f.price || '—')}</span>
+      <span class="expense-row-label">${esc(leg.originIata)} → ${esc(leg.destIata)}</span>
+      <span class="expense-row-amount">${hasPrice ? fmt(legTotal) : '—'}</span>
     </div>`;
   }).join('');
 
@@ -1567,6 +1641,7 @@ function _renderOneoffDrawer() {
       <span class="drawer-chevron">${collapsed ? '▸' : '▾'}</span>
     </div>
     ${collapsed ? '' : `
+      <div class="drawer-desc">Big one-time costs — flights, gear, tours, visas</div>
       <div class="drawer-budget-row" onclick="event.stopPropagation()">
         <span class="daily-rate-label">Budget</span>
         <span class="daily-rate-edit" onclick="startEditPlanned('oneoff','',this)">${planned != null ? fmt(planned) : 'set budget'}</span>
@@ -1634,6 +1709,7 @@ function _renderDailyDrawer() {
       <span class="drawer-chevron">${collapsed ? '▸' : '▾'}</span>
     </div>
     ${collapsed ? '' : `
+      <div class="drawer-desc">Set a daily rate per country — we'll calculate the total from your planned days</div>
       ${_renderMeter(totalActual, totalPlanned)}
       ${countrySections || '<div style="padding:14px 18px;color:var(--ink-soft);font-size:14px">No countries yet — add them in the Countries tab.</div>'}
     `}`;
@@ -1663,6 +1739,7 @@ function _renderContingencyDrawer() {
       <span class="drawer-chevron">${collapsed ? '▸' : '▾'}</span>
     </div>
     ${collapsed ? '' : `
+      <div class="drawer-desc">Your safety buffer for the unexpected</div>
       <div class="drawer-budget-row" onclick="event.stopPropagation()">
         <span class="daily-rate-label">Budget</span>
         <span class="daily-rate-edit" onclick="startEditPlanned('contingency','',this)">${planned != null ? fmt(planned) : 'set budget'}</span>
