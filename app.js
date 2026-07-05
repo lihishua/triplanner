@@ -854,11 +854,11 @@ async function generatePlan() {
     const suggestions = data.actionable || [];
     if (suggestions.length) {
       out.innerHTML += `<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">
-        <div style="font-family:'Fraunces',serif;font-weight:600;font-size:14px;margin-bottom:10px;color:var(--ink-soft)">Worth adding</div>
+        <div style="font-family:'Fraunces',Helvetica,Arial,sans-serif;font-weight:600;font-size:14px;margin-bottom:10px;color:var(--ink-soft)">Worth adding</div>
         ${suggestions.map((s, i) => `
           <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)">
             <div style="flex:1">
-              <span style="font-family:'Fraunces',serif;font-weight:600;font-size:16px">${esc(s.name)}</span>
+              <span style="font-family:'Fraunces',Helvetica,Arial,sans-serif;font-weight:600;font-size:16px">${esc(s.name)}</span>
               ${s.days ? `<span style="color:var(--ink-soft);font-size:13px;margin-left:8px">~${s.days} days</span>` : ''}
               <div style="color:var(--ink-soft);font-size:13px;margin-top:2px">${esc(s.reason || '')}</div>
             </div>
@@ -869,7 +869,7 @@ async function generatePlan() {
 
     // Render visa & bureaucracy section
     out.innerHTML += `<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">
-      <div style="font-family:'Fraunces',serif;font-weight:600;font-size:14px;margin-bottom:10px;color:var(--ink-soft)">Visa & bureaucracy</div>
+      <div style="font-family:'Fraunces',Helvetica,Arial,sans-serif;font-weight:600;font-size:14px;margin-bottom:10px;color:var(--ink-soft)">Visa & bureaucracy</div>
       ${renderVisaSection(wantsVisaInfo, visaResult)}
     </div>`;
   } catch (e) {
@@ -890,7 +890,7 @@ function renderVisaSection(wantsVisaInfo, visaResult) {
   }
   return visas.map(v => `
     <div style="padding:8px 0;border-bottom:1px solid var(--line)">
-      <div style="font-family:'Fraunces',serif;font-weight:600;font-size:15px">
+      <div style="font-family:'Fraunces',Helvetica,Arial,sans-serif;font-weight:600;font-size:15px">
         ${esc(v.country)}
         ${v.max_stay ? `<span style="color:var(--ink-soft);font-weight:400;font-size:13px"> · ${esc(v.max_stay)}</span>` : ''}
       </div>
@@ -1058,7 +1058,7 @@ async function openCity(id) {
     <div style="margin:12px 0">
       <textarea id="place-notes-input" rows="2"
         placeholder="Add notes — what it is, why you want to go, tips…"
-        style="font-family:'Newsreader',serif;font-size:15px;resize:vertical"
+        style="font-family:'Newsreader',Helvetica,Arial,sans-serif;font-size:15px;resize:vertical"
         onchange="savePlaceNotes('${c.id}', this.value)">${c.notes ? esc(c.notes) : ''}</textarea>
     </div>
     <div class="ai-block">
