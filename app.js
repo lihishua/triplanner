@@ -2560,14 +2560,55 @@ function zoomResearchImage(url) {
 
 /* ---------------- TRIP PREVIEW (Mapbox globe animation) ---------------- */
 
+// Order a set of legs into a connected trail where each flight's destination
+// is the next flight's origin. Returns { chain, complete } — complete is true
+// only when every leg links into one continuous route.
+function orderLegsAsTrail(legs) {
+  if (legs.length <= 1) return { chain: legs.slice(), complete: true };
+  const origin = f => resolveIata(f.origin);
+  const dest   = f => resolveIata(f.destination);
+
+  const startsAt = new Map();
+  for (const f of legs) {
+    const o = origin(f);
+    if (!startsAt.has(o)) startsAt.set(o, []);
+    startsAt.get(o).push(f);
+  }
+  // The route starts where nothing else lands: an origin that is no leg's destination.
+  const destSet = new Set(legs.map(dest));
+  const start = legs.find(f => !destSet.has(origin(f))) || legs[0];
+
+  const used = new Set();
+  const chain = [];
+  let cur = start;
+  while (cur && !used.has(cur)) {
+    used.add(cur);
+    chain.push(cur);
+    const nexts = (startsAt.get(dest(cur)) || []).filter(f => !used.has(f));
+    cur = nexts[0] || null;
+  }
+  // Append any legs that couldn't be linked, preserving their prior order.
+  for (const f of legs) if (!used.has(f)) chain.push(f);
+  return { chain, complete: used.size === legs.length };
+}
+
 function chainFlightsAsRoute(fs) {
   if (!fs.length) return [];
-  // Group by leg (respects saved legOrder, falls back to west→east)
-  const legs = groupFlightsByLeg(fs);
-  // One representative flight per leg: booked one if available, else first by created_at
-  return legs
+  // One representative flight per leg: booked one if available, else first by created_at.
+  const reps = groupFlightsByLeg(fs)
     .map(leg => leg.flights.find(f => f.booked) || leg.flights[0])
     .filter(Boolean);
+
+  // Prefer a single logical route that links every leg end-to-start.
+  const { chain, complete } = orderLegsAsTrail(reps);
+  if (complete) return chain;
+
+  // No connected route through everything — fall back to only the booked flights.
+  const booked = reps.filter(f => f.booked);
+  if (booked.length) return orderLegsAsTrail(booked).chain;
+
+  // Nothing booked either — best-effort connected ordering of all legs.
+  return chain;
 }
 
 async function previewTrip() {
