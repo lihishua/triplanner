@@ -199,8 +199,11 @@ async function enterTrip(trip) {
   document.getElementById('trip-onboarding').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   renderTripCarousel();
-  await loadLegOrder();
-  await Promise.all([refreshAll(), loadPreferences(), loadBudgetPlanned()]);
+  // Instant paint from the last-cached dataset while the network catches up.
+  if (loadTripCache()) { renderCountries(); renderFlights(); renderResearch(); }
+  // Fetch everything in parallel — no serial leg-order round-trip first.
+  await Promise.all([loadLegOrder(), refreshAll(), loadPreferences(), loadBudgetPlanned()]);
+  renderFlights();   // re-apply leg order once both flights and legOrder have loaded
   renderBudget();
   loadUpdateCenter();
 }
@@ -377,6 +380,31 @@ async function refreshAll() {
   countries = c.data || []; places = ci.data || []; flights = f.data || []; hotels = h.data || [];
   expenses = ex.data || []; research = res.data || [];
   renderCountries(); renderFlights(); renderResearch();
+  saveTripCache();
+}
+
+// Stale-while-revalidate: keep the last fetched dataset in localStorage so a
+// returning visitor sees their trip instantly instead of staring at empty
+// sections while the network round-trip completes.
+function _tripCacheKey() { return 'triplanner_cache_' + TRIP_ID; }
+function saveTripCache() {
+  if (GUEST_MODE || !TRIP_ID) return;
+  try {
+    localStorage.setItem(_tripCacheKey(),
+      JSON.stringify({ countries, places, flights, hotels, expenses, research, legOrder }));
+  } catch (e) { /* quota or serialization issue — cache is best-effort */ }
+}
+function loadTripCache() {
+  if (GUEST_MODE || !TRIP_ID) return false;
+  try {
+    const raw = localStorage.getItem(_tripCacheKey());
+    if (!raw) return false;
+    const d = JSON.parse(raw);
+    countries = d.countries || []; places = d.places || []; flights = d.flights || [];
+    hotels = d.hotels || []; expenses = d.expenses || []; research = d.research || [];
+    if (Array.isArray(d.legOrder)) legOrder = d.legOrder;
+    return true;
+  } catch (e) { return false; }
 }
 
 async function ensureCountry(name, flag) {
@@ -1910,6 +1938,7 @@ async function saveLegOrder(order) {
     return;
   }
   await sb.from('trips').update({ leg_order: json }).eq('id', TRIP_ID);
+  saveTripCache();
 }
 
 async function loadLegOrder() {
@@ -1979,10 +2008,6 @@ const FLAGS={vietnam:'🇻🇳',thailand:'🇹🇭',philippines:'🇵🇭',japan
 function val(id){ return document.getElementById(id).value; }
 function cap(s){ return (s||'').replace(/\b\w/g,c=>c.toUpperCase()).trim(); }
 function esc(s){ return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-function showTab(t){
-  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
-  document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id==='page-'+t));
-}
 function openOverlay(id){ document.getElementById(id).classList.add('show'); }
 
 // Close overlay when tapping the backdrop (outside the modal)
@@ -1990,7 +2015,7 @@ document.addEventListener('click', e => {
   if (e.target.classList.contains('overlay') && e.target.classList.contains('show')) closeAll();
 });
 
-// Swipe left/right to switch tabs
+// Swipe left/right to switch tabs (wraps around at both ends)
 (function() {
   const TABS = ['countries', 'flights', 'budget', 'prep'];
   let _sx = 0, _sy = 0;
@@ -2008,8 +2033,9 @@ document.addEventListener('click', e => {
     const dy = e.changedTouches[0].clientY - _sy;
     if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
     const i = activeIdx();
-    if (dx < 0 && i < TABS.length - 1) showTab(TABS[i + 1]);
-    else if (dx > 0 && i > 0) showTab(TABS[i - 1]);
+    const n = TABS.length;
+    if (dx < 0) showTab(TABS[(i + 1) % n], 1);           // next — prep wraps to countries
+    else        showTab(TABS[(i - 1 + n) % n], -1);      // prev — countries wraps to prep
   }, { passive: true });
 })();
 function openCapture(){
@@ -3188,7 +3214,14 @@ function highlightEls(selectors) {
 
 // Override tab show to load data lazily
 const _origShowTab = showTab;
-function showTab(t) {
+const TAB_ORDER = ['countries', 'flights', 'budget', 'prep'];
+function showTab(t, dir) {
+  const curBtn = document.querySelector('nav.tabs button.active');
+  const from = curBtn ? TAB_ORDER.indexOf(curBtn.dataset.tab) : -1;
+  const to = TAB_ORDER.indexOf(t);
+  if (dir === undefined) dir = (from < 0 || to === from) ? 0 : (to > from ? 1 : -1);
+  const page = document.getElementById('page-' + t);
+  if (page) page.style.setProperty('--page-dx', dir < 0 ? '-22px' : '22px');
   document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + t));
   if (t === 'prep') refreshTodos();

@@ -70,7 +70,9 @@
     background:linear-gradient(90deg,var(--accent),var(--gold));border-radius:2px}
 
   .page{display:none;padding-top:26px}
-  .page.active{display:block}
+  .page.active{display:block;animation:pageIn .34s cubic-bezier(.22,.61,.36,1)}
+  @keyframes pageIn{from{opacity:0;transform:translateX(var(--page-dx,20px))}to{opacity:1;transform:translateX(0)}}
+  @media (prefers-reduced-motion:reduce){.page.active{animation:none}}
   .page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:20px;flex-wrap:wrap}
   .page-head h2{font-family:'Fraunces',Helvetica,Arial,sans-serif;font-weight:600;font-size:24px;position:relative;padding-left:14px}
   .page-head h2::before{content:'';position:absolute;left:0;top:8%;bottom:8%;width:4px;border-radius:3px;background:var(--gold-grad)}
