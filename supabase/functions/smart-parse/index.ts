@@ -11,11 +11,15 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
   try {
-    const { text, imageBase64, imageMediaType, tripContext } = await req.json();
+    const { text, imageBase64, imageMediaType, tripContext, mode, context } = await req.json();
     if (!text && !imageBase64) return json({ error: "Provide text or image" }, 400);
 
     const key = Deno.env.get("ANTHROPIC_API_KEY");
     if (!key) return json({ error: "AI key not configured." }, 503);
+
+    if (mode === "recommendation") {
+      return await classifyRecommendation({ text, imageBase64, imageMediaType, context, key });
+    }
 
     const countries: string[] = tripContext?.countries || [];
     const prepTabs: { id: string; name: string }[] = tripContext?.prepTabs || [
@@ -105,6 +109,74 @@ For unknown content, still make a best guess at type and destination.`;
     return json({ error: String(e) }, 500);
   }
 });
+
+async function classifyRecommendation(
+  { text, imageBase64, imageMediaType, context, key }:
+  { text?: string; imageBase64?: string; imageMediaType?: string;
+    context?: { country?: string; existingCategories?: string[] }; key: string },
+) {
+  const country = context?.country || "this country";
+  const existing = context?.existingCategories || [];
+
+  const systemPrompt = `You sort local travel recommendations into lists for ${country}.
+Existing lists: ${existing.length ? existing.join(", ") : "none yet"}.
+
+Classify the input into a short lowercase category (e.g. "restaurants", "drivers", "nannies", "activities").
+Reuse one of the existing lists when the input clearly fits it; otherwise invent a concise new category.
+
+Return ONLY a JSON object — no markdown:
+{
+  "category": "lowercase list name",
+  "title": "the name (restaurant name, person's name, etc.)",
+  "city": "city name if this is a place like a restaurant, else null"
+}
+
+Rules:
+- Restaurants and other places: fill "title" with the name and "city" with the city.
+- People (nanny, driver, guide, babysitter): fill "title" with the person's name, set "city" to null.
+- If you cannot tell, use category "unsorted" and your best-guess title.`;
+
+  const contentBlocks: unknown[] = [];
+  if (imageBase64) {
+    contentBlocks.push({
+      type: "image",
+      source: { type: "base64", media_type: (imageMediaType || "image/jpeg") as "image/jpeg" | "image/png" | "image/gif" | "image/webp", data: imageBase64 },
+    });
+  }
+  contentBlocks.push({
+    type: "text",
+    text: text ? `Classify this recommendation:\n${text}`
+               : "Classify the recommendation shown in the image above.",
+  });
+
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 300,
+      system: systemPrompt,
+      messages: [{ role: "user", content: contentBlocks }],
+    }),
+  });
+
+  const data = await r.json();
+  if (!r.ok) return json({ error: `Anthropic API error: ${JSON.stringify(data)}` }, 502);
+  const raw = (data.content || []).map((b: { text: string }) => b.text).join("").trim();
+
+  let category = "unsorted", title = "", city: string | null = null;
+  try {
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (match) {
+      const parsed = JSON.parse(match[0]);
+      category = (parsed.category || "unsorted").toString().toLowerCase().trim() || "unsorted";
+      title = (parsed.title || "").toString().trim();
+      city = parsed.city ? parsed.city.toString().trim() : null;
+    }
+  } catch (_) { /* fall through to defaults */ }
+
+  return json({ category, title, city });
+}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
