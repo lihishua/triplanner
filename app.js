@@ -1010,7 +1010,8 @@ function openCountry(id) {
 
     <div class="add-place-row">
       <button class="btn small" onclick="openAddHotel('${c.id}')">＋ Add hotel</button>
-    </div>`;
+    </div>
+    ${renderRecsSection(c.id)}`;
 
   openOverlay('ov-detail');
 }
@@ -2014,6 +2015,65 @@ function cap(s){ return (s||'').replace(/\b\w/g,c=>c.toUpperCase()).trim(); }
 function esc(s){ return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function recsForCountry(countryId) {
   return recommendations.filter(r => r.country_id === countryId);
+}
+const CAT_EMOJI = {
+  restaurants: '🍽', restaurant: '🍽', food: '🍽',
+  drivers: '🚗', driver: '🚗', transport: '🚗',
+  nannies: '👶', nanny: '👶', babysitters: '👶',
+  guides: '🧭', guide: '🧭', activities: '🎟', activity: '🎟',
+  hotels: '🏨', shopping: '🛍', unsorted: '📌',
+};
+function catEmoji(cat) { return CAT_EMOJI[(cat || '').toLowerCase()] || '📌'; }
+
+async function deleteRecommendation(id, countryId) {
+  const rec = recommendations.find(r => r.id === id);
+  recommendations = recommendations.filter(r => r.id !== id);
+  if (GUEST_MODE) lsDelete('recommendations', id);
+  else {
+    await sb.from('recommendations').delete().eq('id', id);
+    if (rec?.image_url && rec.image_url.includes('/research/')) {
+      const path = rec.image_url.split('/research/')[1];
+      if (path) await sb.storage.from('research').remove([path]);
+    }
+  }
+  openCountry(countryId);
+}
+
+function renderRecsSection(countryId) {
+  const recs = recsForCountry(countryId);
+  const groups = {};
+  for (const r of recs) {
+    const key = (r.category || 'unsorted').toLowerCase();
+    (groups[key] = groups[key] || []).push(r);
+  }
+  const groupNames = Object.keys(groups).sort();
+
+  const groupsHtml = groupNames.map(key => {
+    const items = groups[key].map(r => `
+      <div class="rec-item" data-id="${r.id}">
+        <span class="rec-title">${esc(r.title || 'Untitled')}${r.city ? ` <span class="rec-city">· ${esc(r.city)}</span>` : ''}</span>
+        ${r.link ? `<a href="${esc(r.link)}" target="_blank" style="text-decoration:none">🔗</a>` : ''}
+        ${r.image_url ? `<a href="${esc(r.image_url)}" target="_blank" style="text-decoration:none">🖼</a>` : ''}
+        <button class="del" style="position:static;opacity:.35;font-size:17px;margin-left:2px"
+          onclick="deleteRecommendation('${r.id}','${countryId}')">×</button>
+      </div>`).join('');
+    return `<div class="rec-group">
+      <div class="rec-group-head">${catEmoji(key)} ${esc(cap(key))}</div>${items}</div>`;
+  }).join('');
+
+  return `
+    <div class="places-header" style="margin-top:24px">Recommendations</div>
+    <div class="rec-capture">
+      <input id="rec-input-${countryId}" placeholder="Paste a link, a name, or attach a screenshot…" style="flex:1"
+        onkeydown="if(event.key==='Enter')submitRecommendation('${countryId}')">
+      <input type="file" accept="image/*" id="rec-file-${countryId}" style="display:none"
+        onchange="submitRecommendation('${countryId}', this.files[0])">
+      <button class="btn ghost small" onclick="document.getElementById('rec-file-${countryId}').click()">📎</button>
+      <button class="btn small" onclick="submitRecommendation('${countryId}')">Add</button>
+    </div>
+    <div id="rec-status-${countryId}" class="rec-status"></div>
+    ${groupsHtml || '<div class="empty" style="margin:8px 0 12px">Paste a link, name, or screenshot — I\'ll sort it into the right list.</div>'}
+  `;
 }
 function openOverlay(id){ document.getElementById(id).classList.add('show'); }
 
