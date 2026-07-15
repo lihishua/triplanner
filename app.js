@@ -2076,8 +2076,6 @@ function renderRecsSection(countryId) {
   `;
 }
 
-let _recPendingId = null;
-
 async function saveRecommendation(countryId, fields) {
   const row = {
     trip_id: TRIP_ID, country_id: countryId,
@@ -2118,7 +2116,7 @@ async function submitRecommendation(countryId, file) {
   }
 
   const link = text.startsWith('http') ? text : null;
-  const existingCategories = [...new Set(recsForCountry(countryId).map(r => (r.category || '').toLowerCase()))];
+  const existingCategories = [...new Set(recsForCountry(countryId).map(r => (r.category || '').toLowerCase()))].filter(c => c && c !== 'unsorted');
   const country = countries.find(c => c.id === countryId);
 
   let result = { category: 'unsorted', title: text && !link ? text : '', city: null };
@@ -2135,15 +2133,16 @@ async function submitRecommendation(countryId, file) {
   // Upload image to the shared research bucket (Supabase only)
   let image_url = null;
   if (file && !GUEST_MODE) {
-    const path = `${TRIP_ID}/${Date.now()}-${file.name}`;
-    const { error: upErr } = await sb.storage.from('research').upload(path, file);
-    if (!upErr) image_url = sb.storage.from('research').getPublicUrl(path).data.publicUrl;
+    try {
+      const path = `${TRIP_ID}/${Date.now()}-${file.name}`;
+      const { error: upErr } = await sb.storage.from('research').upload(path, file);
+      if (!upErr) image_url = sb.storage.from('research').getPublicUrl(path).data.publicUrl;
+    } catch (_) { image_url = null; }
   } else if (file && GUEST_MODE) {
     image_url = `data:${imageMediaType};base64,${imageBase64}`;
   }
 
   const saved = await saveRecommendation(countryId, { ...result, link, image_url });
-  _recPendingId = saved?.id || null;
 
   if (inputEl) inputEl.value = '';
   openCountry(countryId);
