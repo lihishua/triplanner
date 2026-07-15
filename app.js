@@ -2150,7 +2150,29 @@ async function submitRecommendation(countryId, file) {
   showRecChip(countryId, saved, failed);
 }
 
-function showRecChip(_countryId, _rec, _failed) { /* implemented in Task 6 */ }
+function showRecChip(countryId, rec, failed) {
+  const statusEl = document.getElementById(`rec-status-${countryId}`);
+  if (!statusEl || !rec) return;
+  const label = failed ? "Couldn't auto-sort — pick a list" : `Added to ${cap(rec.category)}`;
+  statusEl.innerHTML = `<span class="rec-chip">${esc(label)}
+    <button class="rec-chip-btn" onclick="promptRecCategory('${rec.id}','${countryId}')">change</button></span>`;
+}
+
+function promptRecCategory(id, countryId) {
+  const existing = [...new Set(recsForCountry(countryId).map(r => (r.category || '').toLowerCase()))];
+  const suggestion = existing.filter(c => c !== 'unsorted').join(', ');
+  const next = prompt(`Move to which list?${suggestion ? ` (existing: ${suggestion})` : ''}`, '');
+  if (next && next.trim()) moveRec(id, next.trim().toLowerCase(), countryId);
+}
+
+async function moveRec(id, newCategory, countryId) {
+  const rec = recommendations.find(r => r.id === id);
+  if (!rec) return;
+  rec.category = newCategory;
+  if (GUEST_MODE) lsUpdate('recommendations', id, { category: newCategory });
+  else await sb.from('recommendations').update({ category: newCategory }).eq('id', id);
+  openCountry(countryId);
+}
 
 function openOverlay(id){ document.getElementById(id).classList.add('show'); }
 
