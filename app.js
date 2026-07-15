@@ -2075,6 +2075,83 @@ function renderRecsSection(countryId) {
     ${groupsHtml || '<div class="empty" style="margin:8px 0 12px">Paste a link, name, or screenshot — I\'ll sort it into the right list.</div>'}
   `;
 }
+
+let _recPendingId = null;
+
+async function saveRecommendation(countryId, fields) {
+  const row = {
+    trip_id: TRIP_ID, country_id: countryId,
+    category: (fields.category || 'unsorted').toLowerCase(),
+    title: fields.title || 'Untitled',
+    city: fields.city || null,
+    link: fields.link || null,
+    image_url: fields.image_url || null,
+    created_by: _myUserId,
+  };
+  if (GUEST_MODE) {
+    const saved = lsInsert('recommendations', row);
+    recommendations.push(saved);
+    return saved;
+  }
+  const { data } = await sb.from('recommendations').insert(row).select().single();
+  if (data) recommendations.push(data);
+  return data;
+}
+
+async function submitRecommendation(countryId, file) {
+  const inputEl = document.getElementById(`rec-input-${countryId}`);
+  const statusEl = document.getElementById(`rec-status-${countryId}`);
+  const text = (inputEl?.value || '').trim();
+  if (!text && !file) { if (statusEl) statusEl.textContent = 'Type something or attach an image.'; return; }
+
+  if (statusEl) statusEl.textContent = 'Asking Claude…';
+
+  // Read image (base64 for classify; File kept for upload)
+  let imageBase64 = null, imageMediaType = null;
+  if (file) {
+    imageMediaType = file.type || 'image/jpeg';
+    imageBase64 = await new Promise(res => {
+      const rd = new FileReader();
+      rd.onload = e => res(e.target.result.split(',')[1]);
+      rd.readAsDataURL(file);
+    });
+  }
+
+  const link = text.startsWith('http') ? text : null;
+  const existingCategories = [...new Set(recsForCountry(countryId).map(r => (r.category || '').toLowerCase()))];
+  const country = countries.find(c => c.id === countryId);
+
+  let result = { category: 'unsorted', title: text && !link ? text : '', city: null };
+  let failed = false;
+  try {
+    const body = { mode: 'recommendation', context: { country: country?.name || '', existingCategories } };
+    if (text) body.text = text;
+    if (imageBase64) { body.imageBase64 = imageBase64; body.imageMediaType = imageMediaType; }
+    const { data, error } = await sb.functions.invoke('smart-parse', { body });
+    if (error || !data || data.error) throw error || new Error('parse failed');
+    result = { category: data.category || 'unsorted', title: data.title || result.title, city: data.city || null };
+  } catch (_) { failed = true; result.category = 'unsorted'; }
+
+  // Upload image to the shared research bucket (Supabase only)
+  let image_url = null;
+  if (file && !GUEST_MODE) {
+    const path = `${TRIP_ID}/${Date.now()}-${file.name}`;
+    const { error: upErr } = await sb.storage.from('research').upload(path, file);
+    if (!upErr) image_url = sb.storage.from('research').getPublicUrl(path).data.publicUrl;
+  } else if (file && GUEST_MODE) {
+    image_url = `data:${imageMediaType};base64,${imageBase64}`;
+  }
+
+  const saved = await saveRecommendation(countryId, { ...result, link, image_url });
+  _recPendingId = saved?.id || null;
+
+  if (inputEl) inputEl.value = '';
+  openCountry(countryId);
+  showRecChip(countryId, saved, failed);
+}
+
+function showRecChip(_countryId, _rec, _failed) { /* implemented in Task 6 */ }
+
 function openOverlay(id){ document.getElementById(id).classList.add('show'); }
 
 // Close overlay when tapping the backdrop (outside the modal)
