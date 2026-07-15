@@ -15,6 +15,7 @@ let hotels = [];
 let expenses = [];
 let budgetPlanned = { oneoff: null, contingency: null };
 let research = [];
+let recommendations = [];
 let previewMapInstance = null;
 let _researchImageFile     = null;
 let _researchImageB64      = null;
@@ -366,19 +367,21 @@ async function refreshAll() {
                               .sort((a,b) => (b.spent_on||'').localeCompare(a.spent_on||''));
     research     = lsGet('flight_research').filter(r => r.trip_id === TRIP_ID)
                               .sort((a,b) => b.created_at.localeCompare(a.created_at));
+    recommendations = lsGet('recommendations').filter(r => r.trip_id === TRIP_ID);
     renderCountries(); renderFlights(); renderResearch();
     return;
   }
-  const [c, ci, f, h, ex, res] = await Promise.all([
+  const [c, ci, f, h, ex, res, rec] = await Promise.all([
     sb.from('countries').select('*').eq('trip_id', TRIP_ID).order('created_at'),
     sb.from('places').select('*').eq('trip_id', TRIP_ID).order('created_at'),
     sb.from('flights').select('*').eq('trip_id', TRIP_ID).order('created_at'),
     sb.from('hotels').select('*').eq('trip_id', TRIP_ID).order('created_at'),
     sb.from('expenses').select('*').eq('trip_id', TRIP_ID).order('spent_on', { ascending: false }),
     sb.from('flight_research').select('*').eq('trip_id', TRIP_ID).order('created_at', { ascending: false }),
+    sb.from('recommendations').select('*').eq('trip_id', TRIP_ID).order('created_at'),
   ]);
   countries = c.data || []; places = ci.data || []; flights = f.data || []; hotels = h.data || [];
-  expenses = ex.data || []; research = res.data || [];
+  expenses = ex.data || []; research = res.data || []; recommendations = rec.data || [];
   renderCountries(); renderFlights(); renderResearch();
   saveTripCache();
 }
@@ -391,7 +394,7 @@ function saveTripCache() {
   if (GUEST_MODE || !TRIP_ID) return;
   try {
     localStorage.setItem(_tripCacheKey(),
-      JSON.stringify({ countries, places, flights, hotels, expenses, research, legOrder }));
+      JSON.stringify({ countries, places, flights, hotels, expenses, research, recommendations, legOrder }));
   } catch (e) { /* quota or serialization issue — cache is best-effort */ }
 }
 function loadTripCache() {
@@ -402,6 +405,7 @@ function loadTripCache() {
     const d = JSON.parse(raw);
     countries = d.countries || []; places = d.places || []; flights = d.flights || [];
     hotels = d.hotels || []; expenses = d.expenses || []; research = d.research || [];
+    recommendations = d.recommendations || [];
     if (Array.isArray(d.legOrder)) legOrder = d.legOrder;
     return true;
   } catch (e) { return false; }
@@ -2008,6 +2012,9 @@ const FLAGS={vietnam:'🇻🇳',thailand:'🇹🇭',philippines:'🇵🇭',japan
 function val(id){ return document.getElementById(id).value; }
 function cap(s){ return (s||'').replace(/\b\w/g,c=>c.toUpperCase()).trim(); }
 function esc(s){ return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function recsForCountry(countryId) {
+  return recommendations.filter(r => r.country_id === countryId);
+}
 function openOverlay(id){ document.getElementById(id).classList.add('show'); }
 
 // Close overlay when tapping the backdrop (outside the modal)
