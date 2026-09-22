@@ -455,6 +455,24 @@ async function geocode(q) {
   return { lat: null, lng: null };
 }
 
+/* Resolve a free-text query (e.g. a hotel name) to its city + country via
+   Nominatim. Used to back-fill a hotel's location when the booking page can't
+   be scraped but we have the hotel's name. Returns { city, country } (nulls if
+   nothing matched). */
+async function geocodeAddress(q) {
+  try {
+    const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&q='
+      + encodeURIComponent(q));
+    const j = await r.json();
+    const a = j[0]?.address;
+    if (a) return {
+      city: a.city || a.town || a.village || a.municipality || a.state || null,
+      country: a.country || null,
+    };
+  } catch (e) {}
+  return { city: null, country: null };
+}
+
 /* ---------------- CAPTURE (place → auto-detect country) ---------------- */
 let _placeDebounce = null;
 let _urlDebounce   = null;
@@ -480,23 +498,27 @@ function setCaptureMode(type) {
   const title = document.getElementById('cap-title');
   const label = document.getElementById('cap-place-label');
   const cityRow = document.getElementById('cap-city-row');
+  const priceRow = document.getElementById('cap-price-row');
   const hint = document.getElementById('cap-type-hint');
   if (type === 'hotel') {
     title.textContent = 'Add hotel';
     label.textContent = 'Hotel name';
     cityRow.style.display = '';
+    priceRow.style.display = '';
     hint.textContent = '🏨 Hotel link — will save to your hotels';
     hint.style.display = 'block';
   } else if (type === 'flight') {
     title.textContent = 'Capture a place';
     label.textContent = 'Place';
     cityRow.style.display = 'none';
+    priceRow.style.display = 'none';
     hint.textContent = '✈ Flight link — tap "File it" to open the flights form';
     hint.style.display = 'block';
   } else {
     title.textContent = 'Capture a place';
     label.textContent = 'Place';
     cityRow.style.display = 'none';
+    priceRow.style.display = 'none';
     hint.style.display = 'none';
   }
 }
@@ -520,10 +542,20 @@ async function parseLink(url) {
     const { data, error } = await sb.functions.invoke('parse-link', { body: { url } });
     if (error) { statusEl.textContent = '⚠ type manually'; return; }
 
-    const { name, place, country, type } = data || {};
+    let { name, place, country, price, type } = data || {};
 
     // Upgrade to hotel mode if parse-link detected a hotel listing
     if (type === 'hotel' && _capType !== 'hotel') setCaptureMode('hotel');
+
+    // Booking sites block server-side scraping, so the page often yields only
+    // the hotel name (from its URL slug). When we have a name but no city, look
+    // the hotel up by name to recover its city + country.
+    if (_capType === 'hotel' && name && !place) {
+      statusEl.textContent = 'locating hotel…';
+      const loc = await geocodeAddress(name);
+      place = place || loc.city;
+      country = country || loc.country;
+    }
 
     if (!name && !place && !country) {
       statusEl.textContent = '⚠ type below';
@@ -537,6 +569,8 @@ async function parseLink(url) {
         document.getElementById('cap-place').value = name;
       if (place && !document.getElementById('cap-city').value.trim())
         document.getElementById('cap-city').value = place;
+      if (price && !document.getElementById('cap-price').value.trim())
+        document.getElementById('cap-price').value = price;
     } else {
       if (place && !document.getElementById('cap-place').value.trim())
         document.getElementById('cap-place').value = place;
@@ -635,6 +669,7 @@ async function runCapture() {
     const hotelName   = document.getElementById('cap-place').value.trim();
     const cityInput   = document.getElementById('cap-city').value.trim();
     const countryName = document.getElementById('cap-country').value.trim();
+    const priceInput  = document.getElementById('cap-price').value.trim();
     const effectiveCountry = countryName || cityInput;
     if (!effectiveCountry) return capMsg('Enter the country or city.');
     capMsg('Saving hotel…');
@@ -643,7 +678,7 @@ async function runCapture() {
     let place = null;
     if (cityInput) place = await ensurePlace(cityInput, country.id);
     const row = { trip_id: TRIP_ID, country_id: country.id, place_id: place?.id || null,
-      name: cap(hotelName) || 'Untitled hotel', link: url || null, booked: false };
+      name: cap(hotelName) || 'Untitled hotel', link: url || null, price: priceInput || null, booked: false };
     if (GUEST_MODE) { lsInsert('hotels', row); }
     else {
       const { error } = await sb.from('hotels').insert(row);
@@ -2206,6 +2241,7 @@ document.addEventListener('click', e => {
 function openCapture(){
   document.getElementById('cap-place').value='';
   document.getElementById('cap-city').value='';
+  document.getElementById('cap-price').value='';
   document.getElementById('cap-country').value='';
   document.getElementById('cap-url').value='';
   document.getElementById('cap-country-suggestions').innerHTML='';

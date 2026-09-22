@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
         messages: [{
           role: "user",
           content: `From this webpage content, identify the travel destination. Return ONLY a JSON object, no other text:
-{"name": "hotel/Airbnb/restaurant/attraction name if this is a specific listing, otherwise null", "place": "city or destination name or null", "country": "country name or null", "type": "hotel if this is a hotel or accommodation listing, place if it is a travel content page, null if unclear"}
+{"name": "hotel/Airbnb/restaurant/attraction name if this is a specific listing, otherwise null", "place": "city or destination name or null", "country": "country name or null", "price": "nightly price with its currency symbol if one is clearly shown in the content, e.g. '$120' or '€95', otherwise null", "type": "hotel if this is a hotel or accommodation listing, place if it is a travel content page, null if unclear"}
 
 Content:
 ${pageText.slice(0, 800)}
@@ -70,10 +70,11 @@ ${pageText.slice(0, 800)}
 URL: ${url}
 
 Examples:
-- Booking.com hotel page → {"name": "Hotel Le Marais", "place": "Paris", "country": "France", "type": "hotel"}
-- Airbnb listing → {"name": "Oceanfront Villa", "place": "Bali", "country": "Indonesia", "type": "hotel"}
-- Instagram post about Hoi An → {"name": null, "place": "Hoi An", "country": "Vietnam", "type": "place"}
-If nothing clear, return {"name": null, "place": null, "country": null, "type": null}.`,
+- Booking.com hotel page → {"name": "Hotel Le Marais", "place": "Paris", "country": "France", "price": "$140", "type": "hotel"}
+- Airbnb listing → {"name": "Oceanfront Villa", "place": "Bali", "country": "Indonesia", "price": null, "type": "hotel"}
+- Instagram post about Hoi An → {"name": null, "place": "Hoi An", "country": "Vietnam", "price": null, "type": "place"}
+Only set "price" when a concrete number appears in the content — never guess or invent one.
+If nothing clear, return {"name": null, "place": null, "country": null, "price": null, "type": null}.`,
         }],
       }),
     });
@@ -81,17 +82,23 @@ If nothing clear, return {"name": null, "place": null, "country": null, "type": 
     const data = await r.json();
     const raw = (data.content || []).map((b: any) => b.text).join("").trim();
 
-    let name = null, place = null, country = null, type = null;
+    let name = null, place = null, country = null, price = null, type = null;
     try {
       const match = raw.match(/\{[\s\S]*\}/);
-      if (match) ({ name, place, country, type } = JSON.parse(match[0]));
+      if (match) ({ name, place, country, price, type } = JSON.parse(match[0]));
     } catch (_) {}
 
-    // Fallback: extract hotel name from URL slug when Claude returns null
-    // e.g. booking.com/hotel/lk/cinnamon-grand-colombo.html → "Cinnamon Grand Colombo"
-    if (!name) name = hotelNameFromSlug(url);
+    // Fallback: extract hotel name + country code from URL slug when Claude
+    // returns null. e.g. booking.com/hotel/lk/cinnamon-grand-colombo.html →
+    // { name: "Cinnamon Grand Colombo", cc: "lk" }
+    const slug = hotelFromSlug(url);
+    if (!name) name = slug.name;
 
-    return json({ name, place, country, type });
+    // The booking-site URL country code (e.g. "gb") lets the client geocode the
+    // hotel name unambiguously — "The Savoy" resolves to London, not New York.
+    const cc = slug.cc;
+
+    return json({ name, place, country, price, type, cc });
   } catch (e) {
     return json({ error: String(e) }, 500);
   }
